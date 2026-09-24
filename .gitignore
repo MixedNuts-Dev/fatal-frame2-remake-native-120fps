@@ -1,0 +1,18 @@
+# build output / ビルド生成物
+dist/
+obj/
+*.obj
+*.lib
+*.exp
+*.pdb
+*.ilk
+
+# runtime log / 実行時ログ
+*.log
+
+# editor / OS
+.vs/
+.vscode/
+*.user
+Thumbs.db
+desktop.ini
