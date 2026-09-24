@@ -1,4 +1,6 @@
 ﻿// FATAL FRAME II: Crimson Butterfly REMAKE — Native 120FPS Option
+// Created by MixedNuts - https://github.com/MixedNuts-Dev/fatal-frame2-remake-mods
+// Licensed under the MIT License. See LICENSE for details.
 //
 // ゲーム本体は Steam DRM により .text が暗号化されているため、ファイルへの
 // 静的パッチはできない。復号後のメモリに対して実行時にパッチを当てる。
@@ -369,7 +371,7 @@ DWORD WINAPI Worker(LPVOID param)
     LoadConfig(static_cast<HMODULE>(param));
     if (g_labelId == 0) return 0;
 
-    Log("=== Native 120FPS Option 起動 ===");
+    Log("=== Native 120FPS Option / Created by MixedNuts ===");
 
     // Steam DRM の復号とアーカイブのロードを待つ。
     //

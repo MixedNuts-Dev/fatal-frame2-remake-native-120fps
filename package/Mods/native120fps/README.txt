@@ -1,6 +1,7 @@
 ﻿================================================================
  FATAL FRAME II: Crimson Butterfly REMAKE
  Native 120FPS Option
+ Created by MixedNuts
 ================================================================
 
 
@@ -44,6 +45,19 @@ dinput8.dll と Mods フォルダを削除するだけです。
 Enabled を 0 にしてください。
 
 
+■ 免責事項
+
+この Mod は無保証で提供されます。使用によって生じたいかなる損害に
+ついても、作者は一切の責任を負いません。セーブデータの破損・消失、
+ゲームの動作不良、その他の不具合を含みます。
+自己責任でご使用ください。
+
+導入前に、必ずセーブデータとゲームフォルダのバックアップを
+取ってください。セーブデータの場所は次のとおりです。
+
+  %LOCALAPPDATA%\KoeiTecmo\FatalFrameII\Savedata\
+
+
 ■ 注意事項
 
 ・120FPS を出すには相応の PC 性能と、120Hz 以上に対応した
@@ -57,6 +71,21 @@ Enabled を 0 にしてください。
 ・ウイルス対策ソフトが誤検知することがあります。
   他プロセスのメモリを書き換える仕組みのためで、
   この Mod はネットワーク通信もファイル改変も行いません。
+
+
+■ 不具合の報告
+
+不具合を見つけた場合は、GitHub の Issue でご報告ください。
+その際、必ず native120fps.log を添付してください。
+ログが無いと原因を特定できず、対応できない場合があります。
+
+  https://github.com/MixedNuts-Dev/fatal-frame2-remake-mods/issues
+
+併せて、次の情報をいただけると助かります。
+
+  ・ゲームのバージョン
+  ・GPU とディスプレイのリフレッシュレート
+  ・発生した状況（どの画面で、何をしたとき）
 
 
 ■ 仕組み
@@ -103,7 +132,7 @@ removes that restriction.
 
    Example:
      ...\steamapps\common\FatalFrameII\FatalFrameII.exe
-     ...\steamapps\common\FatalFrameII\dinput8.dll           <- added
+     ...\steamapps\common\FatalFrameII\dinput8.dll        <- added
      ...\steamapps\common\FatalFrameII\Mods\native120fps\ <- added
 
 3. Launch the game and open Options -> Graphics Settings.
@@ -117,6 +146,19 @@ Simply delete dinput8.dll and the Mods folder. No game files are
 modified, so removal restores the original state completely.
 
 To disable temporarily, set Enabled to 0 in native120fps.ini.
+
+
+■ Disclaimer
+
+This mod is provided as-is, without any warranty. The author accepts
+no liability for any damage arising from its use, including but not
+limited to corruption or loss of save data, game malfunction, or any
+other problem. Use it at your own risk.
+
+Before installing, always back up your save data and the game folder.
+Save data is located at:
+
+  %LOCALAPPDATA%\KoeiTecmo\FatalFrameII\Savedata\
 
 
 ■ Notes
@@ -133,6 +175,21 @@ To disable temporarily, set Enabled to 0 in native120fps.ini.
 - Antivirus software may flag this mod. It writes to the memory of
   another process, which is a common false-positive trigger. This mod
   performs no network activity and modifies no files.
+
+
+■ Reporting issues
+
+If you run into a problem, please open a GitHub Issue. Be sure to
+attach native120fps.log. Without the log the cause usually cannot be
+identified, and the issue may not be actionable.
+
+  https://github.com/MixedNuts-Dev/fatal-frame2-remake-mods/issues
+
+The following details also help:
+
+  - Game version
+  - GPU and display refresh rate
+  - What you were doing when it happened
 
 
 ■ How it works
@@ -153,5 +210,18 @@ Only three changes are made:
 
 If something goes wrong, check native120fps.log.
 
+
+================================================================
+
+ Created by MixedNuts
+ https://github.com/MixedNuts-Dev/fatal-frame2-remake-mods
+
+ License: MIT
+ 本ソフトウェアは MIT ライセンスで提供されます。再配布・改変は
+ 自由ですが、著作権表示とライセンス文を必ず残してください。
+
+ This software is provided under the MIT License. You are free to
+ redistribute and modify it, but the copyright notice and the license
+ text must be retained.
 
 ================================================================

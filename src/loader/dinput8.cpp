@@ -1,4 +1,6 @@
 ﻿// FATAL FRAME II: Crimson Butterfly REMAKE — Mod ローダ（dinput8.dll プロキシ）
+// Created by MixedNuts - https://github.com/MixedNuts-Dev/fatal-frame2-remake-mods
+// Licensed under the MIT License. See LICENSE for details.
 //
 // ゲームのルートに置くと自動的にロードされ、
 // Mods\native120fps\native120fps.dll を読み込む。
