@@ -23,8 +23,10 @@ if errorlevel 1 exit /b 1
 
 echo === copying package files ===
 copy /y "%ROOT%package\Mods\native120fps\native120fps.ini" "%OUT%\Mods\native120fps\" >nul
-copy /y "%ROOT%package\Mods\native120fps\README.txt" "%OUT%\Mods\native120fps\" >nul
+copy /y "%ROOT%package\Mods\native120fps\README.md" "%OUT%\Mods\native120fps\" >nul
 
+rem stale output from earlier builds
+if exist "%OUT%\Mods\native120fps\README.txt" del "%OUT%\Mods\native120fps\README.txt"
 rem import library / export file are build by-products
 if exist "%OUT%\dinput8.lib" del "%OUT%\dinput8.lib"
 if exist "%OUT%\dinput8.exp" del "%OUT%\dinput8.exp"

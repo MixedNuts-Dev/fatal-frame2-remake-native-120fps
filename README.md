@@ -1,4 +1,4 @@
-# Native 120FPS Option
+﻿# Native 120FPS Option
 
 **FATAL FRAME II: Crimson Butterfly REMAKE**（零 〜紅い蝶〜 REMAKE / Steam AppID 3920610）用の Mod です。
 A mod for FATAL FRAME / PROJECT ZERO II: Crimson Butterfly REMAKE (Steam, AppID 3920610).
@@ -35,11 +35,13 @@ This differs from editing the `graphics_option.json` settings file by hand:
 
 ## 導入 / Installation
 
-`dist` をビルドし、`dinput8.dll` と `Mods` フォルダをゲームのルート
-（`FatalFrameII.exe` と同じ場所）にコピーします。
+**ビルドは不要です。** [Releases](../../releases) から配布物をダウンロードし、
+中身の `dinput8.dll` と `Mods` フォルダを、ゲームのルート（`FatalFrameII.exe` と
+同じ場所）にそのままコピーするだけです。
 
-Build `dist`, then copy `dinput8.dll` and the `Mods` folder into the game's root
-directory (the folder containing `FatalFrameII.exe`).
+**No build required.** Download the archive from [Releases](../../releases) and copy
+`dinput8.dll` and the `Mods` folder into the game's root directory (the folder
+containing `FatalFrameII.exe`).
 
 ```
 FatalFrameII/
@@ -47,7 +49,7 @@ FatalFrameII/
   dinput8.dll                          <- added
   Mods/native120fps/native120fps.dll   <- added
   Mods/native120fps/native120fps.ini
-  Mods/native120fps/README.txt
+  Mods/native120fps/README.md
 ```
 
 ゲームを起動し、オプション → グラフィック設定を開くと、最大 FPS が 3 択になります。
