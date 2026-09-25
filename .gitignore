@@ -16,3 +16,6 @@ obj/
 *.user
 Thumbs.db
 desktop.ini
+
+# release archive / 配布用アーカイブ
+*.zip

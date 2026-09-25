@@ -24,6 +24,7 @@ if errorlevel 1 exit /b 1
 echo === copying package files ===
 copy /y "%ROOT%package\Mods\native120fps\native120fps.ini" "%OUT%\Mods\native120fps\" >nul
 copy /y "%ROOT%package\Mods\native120fps\README.md" "%OUT%\Mods\native120fps\" >nul
+copy /y "%ROOT%LICENSE" "%OUT%\Mods\native120fps\LICENSE.txt" >nul
 
 rem stale output from earlier builds
 if exist "%OUT%\Mods\native120fps\README.txt" del "%OUT%\Mods\native120fps\README.txt"
