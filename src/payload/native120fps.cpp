@@ -17,6 +17,8 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <utility>
 
 namespace {
 
@@ -83,21 +85,12 @@ constexpr uint32_t kId60 = 0x00CB7EE4;
 
 // 3つ目の選択肢に使うラベル ID（ini で変更可）
 //
-// 0x00D9E01F は MES_MENU の通し番号 257 に対応する文字列で、中身は
-// 翻訳漏れのプレースホルダ "[[3537079]]"。この ID を参照している
+// 0x00D9E01F は MES_MENU の通し番号 257 に対応する。この ID を参照している
 // OPTION_MENU_SELECT_ECB の行（sel r36）はどの項目からも参照されておらず、
-// ゲーム中のどこにも表示されない。そこを "120" に書き換えて流用する。
+// ゲーム中のどこにも表示されないため、流用しても副作用がない。
+// 実際に "120" と表示させるための文字列の差し替えは、ローダ側が
+// archive_06.lnk の改変版を用意して行う。
 uint32_t g_labelId = 0x00D9E01F;
-
-// 置き換え対象の文字列（UTF-16LE の "[[3537079]]" + 終端）
-const uint8_t kOldLabel[] = {
-    0x5B, 0x00, 0x5B, 0x00, 0x33, 0x00, 0x35, 0x00, 0x33, 0x00, 0x37, 0x00,
-    0x30, 0x00, 0x37, 0x00, 0x39, 0x00, 0x5D, 0x00, 0x5D, 0x00, 0x00, 0x00,
-};
-// "120" + 終端。残りは 0 で埋めて元のスロット長に収める
-const uint8_t kNewLabel[sizeof(kOldLabel)] = {
-    0x31, 0x00, 0x32, 0x00, 0x30, 0x00, 0x00, 0x00,
-};
 
 // ---- ユーティリティ -----------------------------------------------------
 
@@ -215,49 +208,8 @@ bool ScanRegion(uint8_t* p, size_t n, size_t start, const uint8_t*, size_t& foun
     return false;
 }
 
-bool g_labelDone = false;   // ラベル文字列の差し替え済みフラグ
 bool g_tableDone = false;   // 選択肢テーブルの拡張済みフラグ
 
-// 任意のバイト列を SEH 保護付きで探す（ラベル文字列の差し替え用）
-bool ScanBytes(uint8_t* p, size_t n, size_t start, const uint8_t* pat, size_t len,
-               size_t& foundOff)
-{
-    __try
-    {
-        for (size_t i = start; i + len <= n; i += 16)
-        {
-            if (p[i] == pat[0] && memcmp(p + i, pat, len) == 0)
-            {
-                foundOff = i;
-                return true;
-            }
-        }
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {}
-    return false;
-}
-
-// 指定領域内でラベル文字列を "120" に差し替える。
-// 文字列プールは 16 バイト境界に並ぶので、その刻みで探せば十分速い。
-void PatchLabelInRegion(uint8_t* p, size_t n)
-{
-    if (g_labelDone) return;
-    const uint64_t t0 = GetTickCount64();
-    size_t at = 0;
-    while (ScanBytes(p, n, at, kOldLabel, sizeof(kOldLabel), at))
-    {
-        if (WriteMem(p + at, kNewLabel, sizeof(kNewLabel)))
-        {
-            Log("[OK] ラベルを \"120\" に差し替え (0x%p, %llu ms)", p + at,
-                static_cast<unsigned long long>(GetTickCount64() - t0));
-            g_labelDone = true;
-            return;
-        }
-        at += 16;
-    }
-    Log("[NG] ラベル文字列が見つかりません (%llu ms)",
-        static_cast<unsigned long long>(GetTickCount64() - t0));
-}
 
 // 偽ヒット（スタック上の一時コピーなど）を排除するため、
 // ブロック先頭が 'ecb\0' であることを確認する。
@@ -271,6 +223,14 @@ bool LooksLikeEcb(uint8_t* slot1)
     __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
 
+// 候補領域をサイズの大きい順に見る。
+//
+// アーカイブは数GB規模の巨大な確保領域の中にあり、小さな領域が多数あるため、
+// 素直に番地順で舐めると目的の領域に辿り着くまでが遅い。大きい方から見れば
+// 通常は最初の領域で見つかる。
+//
+// 「各領域の先頭だけを見る」という絞り方も試したが、候補領域が多いため
+// 1周に数秒かかるうえ、アーカイブが先頭付近にあるとは限らず逆効果だった。
 bool PatchChoiceTable()
 {
     SYSTEM_INFO si{};
@@ -282,6 +242,8 @@ bool PatchChoiceTable()
     memcpy(pattern, &kId30, 4);
     memcpy(pattern + 4, &kId60, 4);
 
+    // まず候補領域を集める
+    std::vector<std::pair<uint8_t*, size_t>> cands;
     MEMORY_BASIC_INFORMATION mbi{};
     while (addr < maxA && VirtualQuery(addr, &mbi, sizeof(mbi)) == sizeof(mbi))
     {
@@ -298,9 +260,23 @@ bool PatchChoiceTable()
                                mbi.RegionSize >= 0x10000 &&
                                mbi.RegionSize <= (8ull << 30);
         if (candidate)
+            cands.emplace_back(static_cast<uint8_t*>(mbi.BaseAddress), mbi.RegionSize);
+
+        auto next0 = static_cast<uint8_t*>(mbi.BaseAddress) + mbi.RegionSize;
+        if (next0 <= addr) break;
+        addr = next0;
+    }
+
+    // 大きい領域から先に見る
+    std::sort(cands.begin(), cands.end(),
+              [](const std::pair<uint8_t*, size_t>& a,
+                 const std::pair<uint8_t*, size_t>& b) { return a.second > b.second; });
+
+    for (const auto& c : cands)
+    {
         {
-            auto p = static_cast<uint8_t*>(mbi.BaseAddress);
-            const size_t n = mbi.RegionSize;
+            uint8_t* const p = c.first;
+            const size_t n = c.second;
 
             size_t at = 0;
             while (ScanRegion(p, n, at, pattern, at))
@@ -324,10 +300,6 @@ bool PatchChoiceTable()
                 {
                     Log("[OK] 選択肢を 3 つに拡張 (0x%p, ラベルID 0x%08X)", count, g_labelId);
                     g_tableDone = true;
-                    // メッセージプールは ECB と同じアロケーション内にあるので、
-                    // この領域だけを対象にラベル文字列を差し替える。
-                    // 全領域を舐めると時間がかかりすぎてパッチが間に合わない。
-                    PatchLabelInRegion(p, n);
                 }
                 else
                 {
@@ -336,12 +308,7 @@ bool PatchChoiceTable()
                 break;
             }
         }
-        // どちらも終わったら走査を打ち切る。片方だけなら残りの領域も見る。
         if (g_tableDone) break;
-
-        auto next = static_cast<uint8_t*>(mbi.BaseAddress) + mbi.RegionSize;
-        if (next <= addr) break;
-        addr = next;
     }
     return g_tableDone;
 }

@@ -24,10 +24,12 @@ This differs from editing the `graphics_option.json` settings file by hand:
   直接編集する必要はなく、他の設定と同じようにメニューから選べます。
   **"120" appears as a real option in the in-game settings screen.** No manual file
   editing — you pick it from the menu like any other setting.
-- **ゲームのファイルを一切変更しません。** すべて実行時のメモリ操作で、
-  導入した 2 つを消せば完全に元へ戻ります。
-  **No game files are modified at all.** Everything happens in memory at runtime;
-  deleting the two added items restores the original state completely.
+- **ゲームのファイルを一切変更しません。** 書き換えるのは実行中のメモリと、
+  Mod 自身のフォルダ内に生成した作業用ファイルだけです。導入した 2 つを消せば
+  完全に元へ戻ります。
+  **No game files are modified at all.** The mod only writes to process memory at
+  runtime and to a working file it generates inside its own folder; deleting the
+  two added items restores the original state completely.
 - 直接書き換える方法では、ゲーム内でグラフィック設定を変更するたびに値が
   上書きされてしまいますが、この Mod ではその問題が起きません。
   When the file is edited by hand, the value is overwritten whenever you change any
@@ -50,7 +52,15 @@ FatalFrameII/
   Mods/native120fps/native120fps.dll   <- added
   Mods/native120fps/native120fps.ini
   Mods/native120fps/README.md
+  Mods/native120fps/native120fps.log   <- 起動時に生成 / generated at launch
+  Mods/native120fps/archive_06.lnk     <- 初回起動時に生成 / generated on first launch
+  Mods/native120fps/archive_06.lnk.tag
 ```
+
+`archive_06.lnk` は初回起動時に Mod が自動生成します（約 9MB）。ゲーム側の
+同名ファイルには一切手を加えません。
+`archive_06.lnk` (about 9 MB) is generated automatically on first launch. The game's
+own copy of that file is never touched.
 
 ゲームを起動し、オプション → グラフィック設定を開くと、最大 FPS が 3 択になります。
 3 つ目を選び、タイトル画面まで戻ると反映されます。
@@ -59,6 +69,18 @@ Launch the game and open Options → Graphics Settings; the max FPS option now h
 entries. Select the third one and return to the title screen to apply it.
 
 削除は 2 つを消すだけです。 / To uninstall, just delete them.
+
+## 対応言語 / Language support
+
+**公式にサポートするのは日本語と英語です。** この 2 つは動作を確認しています。
+**Japanese and English are officially supported**, and both are verified.
+
+その他の言語でも 3 つ目の選択肢は選べますが、ラベルの表示までは保証しません。
+イタリア語では、3 つ目のラベルに無関係な文字列が表示されます（機能そのものは
+正常に動作します）。
+The third entry is selectable in the other languages as well, but its label is not
+guaranteed. In Italian the third entry shows an unrelated string — the feature
+itself still works correctly.
 
 ## ビルド / Build
 
@@ -86,8 +108,30 @@ as a file.** The patch is applied to the decrypted code in memory after launch.
    Remove the hardcoded check that accepts only selection index 0 and 1 (8 bytes).
 2. 選択肢の定義テーブル（`OPTION_MENU_SELECT_ECB`）を 2 択から 3 択に拡張する
    Extend the choice table (`OPTION_MENU_SELECT_ECB`) from two entries to three.
-3. 未使用のまま残っていた文字列枠を「120」に書き換え、3 つ目のラベルとして使う
-   Rewrite an unused placeholder string to `120` and use it as the third label.
+3. 3 つ目のラベルを「120」と表示させる
+   Make the third entry display `120`.
+
+3 番目のラベルだけはメモリ上への書き込みでは足りません。ゲームがメッセージ
+ブロックを同じアドレスへ読み直すため、書き込んでも元へ戻ってしまいます。
+そこで、メッセージを収めた `archive\archive_06.lnk` を **ユーザー自身の
+ゲームフォルダから読み取り、未使用の文字列枠を「120」に書き換えた複製を
+`Mods\native120fps\` 内に生成**し、`CreateFileW` を横取りしてそちらを読ませています。
+ゲーム側のファイルは読むだけで、書き換えません。
+
+The third label cannot be handled in memory alone: the game reloads the message block
+into the same address, so any write is undone. Instead the mod **reads
+`archive\archive_06.lnk` from the user's own game folder, writes a copy with the
+unused string slot replaced by `120` into `Mods\native120fps\`**, and hooks
+`CreateFileW` so the game opens that copy. The game's own file is only read, never
+written.
+
+配布物に改変済みのゲームデータは含まれません。複製はユーザーの環境で生成されます。
+No modified game data is redistributed; the copy is generated on the user's machine.
+
+書き換え先の文字列枠は、空であるか既知のプレースホルダであることを確認してから
+書き込みます。他の用途で使われている言語（イタリア語）では書き込みを見送ります。
+A slot is only written when it is empty or holds the known placeholder. Languages
+where the slot is already in use (Italian) are skipped.
 
 パッチ位置はアドレス直指定ではなく AOB スキャンで探します。錨にしているのは
 `mov edx, 0x3B726180`（`OPTION_MENU_ITEM_ECB` の FPS 項目 ID）で、これは非常に
@@ -131,6 +175,8 @@ Save data is located at:
   A game update may change the signature and break this mod.
 - 他プロセスのメモリを書き換えるため、ウイルス対策ソフトが誤検知することがあります
   Antivirus software may flag it, since it writes to another process's memory.
+- 初回起動時に約 9MB の作業用ファイルを Mod 自身のフォルダ内に生成します
+  About 9 MB of working data is generated inside the mod's own folder on first launch.
 
 ## 不具合の報告 / Reporting issues
 
