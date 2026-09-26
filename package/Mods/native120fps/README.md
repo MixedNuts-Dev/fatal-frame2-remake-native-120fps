@@ -173,8 +173,9 @@ Created by MixedNuts
 まず上の「既知の問題」を確認してください。**カーソルが 30 に見えるだけで、実際は
 120 で動いていることがあります。**オーバーレイなどで実測値を確認してください。
 
-実測でも 30FPS だった場合、次の順に確認してください。**性能不足なら 70〜90FPS の
-ように値が揺れます。きっちり 30 に張り付く場合は、どこかで上限が掛かっています。**
+実測でも 30FPS だった場合、次の順に確認してください。**性能が足りていない場合は、
+きりの良い数値に留まらず値が揺れます。きっちり 30 に張り付く場合は、どこかで
+上限が掛かっています。**
 
 1. `native120fps.log` の最終行が `=== 完了 ===` になっているか。
    `コード:未発見 テーブル:OK` のようになっていれば、パッチが片方しか
@@ -405,9 +406,9 @@ screen** before opening the options menu.
 First check "Known issues" above. **The cursor can look like it is on 30 while the
 game is actually running at 120.** Confirm the real frame rate with an overlay.
 
-If you really are measuring 30 FPS, check the following in order. **A performance
-shortfall gives you a fluctuating 70-90 FPS; a rock-steady 30 means something is
-capping it.**
+If you really are measuring 30 FPS, check the following in order. **When a GPU
+simply can't keep up, the frame rate fluctuates rather than sitting on a round
+number; a rock-steady 30 means something is capping it.**
 
 1. Does the last line of `native120fps.log` read `=== 完了 ===`? If it reads
    something like `コード:未発見 テーブル:OK`, only one of the two patches
