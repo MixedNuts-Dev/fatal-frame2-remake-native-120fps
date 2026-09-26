@@ -191,14 +191,15 @@ bool EnsurePatchedArchive(const std::wstring& src, const std::wstring& dst)
     std::vector<uint8_t> buf;
     if (!ReadWholeFile(src, buf))
     {
-        Log("[NG] archive_06.lnk を読めません");
+        Log("[NG] Cannot read archive_06.lnk");
         return false;
     }
     int skipped = 0;
     const int n = PatchLabels(buf, skipped);
     if (n == 0)
     {
-        Log("[NG] ラベル枠が見つかりません。ゲームの更新で構造が変わった可能性があります");
+        Log("[NG] Label slot not found. A game update may have changed the layout;"
+            " the third entry will show no text.");
         return false;
     }
 
@@ -206,19 +207,20 @@ bool EnsurePatchedArchive(const std::wstring& src, const std::wstring& dst)
     const std::wstring tmp = dst + L".tmp";
     if (!WriteWholeFile(tmp, buf))
     {
-        Log("[NG] 改変版の書き出しに失敗しました");
+        Log("[NG] Failed to write the patched copy");
         DeleteFileW(tmp.c_str());
         return false;
     }
     DeleteFileW(dst.c_str());
     if (!MoveFileW(tmp.c_str(), dst.c_str()))
     {
-        Log("[NG] 改変版の配置に失敗しました");
+        Log("[NG] Failed to install the patched copy");
         DeleteFileW(tmp.c_str());
         return false;
     }
     WriteTag(tag, srcSize);
-    Log("[OK] 改変版 archive_06.lnk を生成 (%d 言語に適用 / %d 言語は見送り / %lld bytes)",
+    Log("[OK] Generated patched archive_06.lnk (%d languages patched /"
+        " %d skipped / %lld bytes)",
         n, skipped, static_cast<long long>(buf.size()));
     return true;
 }
@@ -258,7 +260,7 @@ HANDLE WINAPI MyCreateFileW(LPCWSTR name, DWORD access, DWORD share,
         {
             HANDLE h = g_origCreateFileW(dst.c_str(), access, share, sa, disp, flags, tmpl);
             if (h != INVALID_HANDLE_VALUE) return h;
-            Log("[NG] 改変版を開けないため、ゲームのファイルを使います");
+            Log("[NG] Cannot open the patched copy; falling back to the game's own file");
         }
     }
     return g_origCreateFileW(name, access, share, sa, disp, flags, tmpl);

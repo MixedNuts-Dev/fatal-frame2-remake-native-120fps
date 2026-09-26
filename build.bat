@@ -18,7 +18,7 @@ cl /nologo /LD /O2 /EHsc /MT /W3 /std:c++17 /utf-8 /DNDEBUG /Fo"%OBJ%\l_" /Fe"%O
 if errorlevel 1 exit /b 1
 
 echo === payload (native120fps.dll) ===
-cl /nologo /LD /O2 /EHsc /MT /W3 /std:c++17 /utf-8 /DNDEBUG /Fo"%OBJ%\p_" /Fe"%OUT%\Mods\native120fps\native120fps.dll" "%ROOT%src\payload\native120fps.cpp" /link /OPT:REF /OPT:ICF
+cl /nologo /LD /O2 /EHsc /MT /W3 /std:c++17 /utf-8 /DNDEBUG /Fo"%OBJ%\p_" /Fe"%OUT%\Mods\native120fps\native120fps.dll" "%ROOT%src\payload\native120fps.cpp" /link /OPT:REF /OPT:ICF version.lib user32.lib
 if errorlevel 1 exit /b 1
 
 echo === copying package files ===

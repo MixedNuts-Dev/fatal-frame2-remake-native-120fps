@@ -159,11 +159,13 @@ Created by MixedNuts
 ログに次の行が出ていれば正常に適用されています。
 
 ```
-[OK] メニューハンドラを解除
-[OK] 改変版 archive_06.lnk を生成
-[OK] 選択肢を 3 つに拡張
-=== 完了 ===
+[OK] Generated patched archive_06.lnk
+[OK] Menu handler unlocked
+[OK] Choice table extended to 3 entries
+=== Done (attempt 3). The FPS option now has three entries ===
 ```
+
+ログは英語で出力されます。
 
 なお Mod は起動から数秒かけて適用されます。**タイトル画面まで進んでから**
 オプションを開いてください。
@@ -177,9 +179,10 @@ Created by MixedNuts
 きりの良い数値に留まらず値が揺れます。きっちり 30 に張り付く場合は、どこかで
 上限が掛かっています。**
 
-1. `native120fps.log` の最終行が `=== 完了 ===` になっているか。
-   `コード:未発見 テーブル:OK` のようになっていれば、パッチが片方しか
-   当たっていません（この状態だと 3 つ目を選ぶと 30FPS になります）
+1. `native120fps.log` の最終行が `=== Done ... ===` になっているか。
+   `=== Gave up ... code: ... table: OK ===` のようになっていれば、パッチが
+   片方しか当たっていません（この状態だと 3 つ目を選ぶと 30FPS になります）。
+   その場合、ログに `[!!]` で始まる説明が出ています
 2. NVIDIA コントロールパネルの **垂直同期**が「アダプティブ（ハーフリフレッシュ
    レート）」になっていないか。60Hz のディスプレイではちょうど 30FPS になります
 3. 同じ画面の **「最大フレームレート」**が低い値に設定されていないか
@@ -195,6 +198,11 @@ Created by MixedNuts
 不具合を見つけた場合は、GitHub の Issue でご報告ください。その際、**必ず
 `native120fps.log` を添付してください。** ログが無いと原因を特定できず、
 対応できない場合があります。
+
+ログには、ゲームのバージョンと Steam のビルド番号、画面の解像度と
+リフレッシュレート、GPU 名、OS のビルド、保存されている FPS 設定が
+記録されます。ゲームのインストール先のパスも含まれるので、
+気になる場合はその行を消してから添付してください。
 
 https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
 
@@ -390,13 +398,11 @@ If the option still shows only two entries, check the following:
 If the log contains these lines, the patch was applied correctly:
 
 ```
-[OK] メニューハンドラを解除
-[OK] 改変版 archive_06.lnk を生成
-[OK] 選択肢を 3 つに拡張
-=== 完了 ===
+[OK] Generated patched archive_06.lnk
+[OK] Menu handler unlocked
+[OK] Choice table extended to 3 entries
+=== Done (attempt 3). The FPS option now has three entries ===
 ```
-
-(The log is written in Japanese.)
 
 Note that the mod takes a few seconds after launch to apply. **Reach the title
 screen** before opening the options menu.
@@ -410,9 +416,10 @@ If you really are measuring 30 FPS, check the following in order. **When a GPU
 simply can't keep up, the frame rate fluctuates rather than sitting on a round
 number; a rock-steady 30 means something is capping it.**
 
-1. Does the last line of `native120fps.log` read `=== 完了 ===`? If it reads
-   something like `コード:未発見 テーブル:OK`, only one of the two patches
-   applied — in that state, picking the third entry does give you 30 FPS
+1. Does the last line of `native120fps.log` read `=== Done ... ===`? If it
+   reads `=== Gave up ... code: ... table: OK ===` instead, only one of the two
+   patches applied — in that state, picking the third entry does give you 30
+   FPS. The log explains what happened on the lines starting with `[!!]`
 2. In the NVIDIA Control Panel, is **Vertical sync** set to "Adaptive (half refresh
    rate)"? On a 60 Hz display that caps the game at exactly 30 FPS
 3. On the same page, is **"Max Frame Rate"** set to a low value?
@@ -428,6 +435,11 @@ number; a rock-steady 30 means something is capping it.**
 If you run into a problem, please open a GitHub Issue. **Be sure to attach
 `native120fps.log`.** Without the log the cause usually cannot be identified,
 and the issue may not be actionable.
+
+The log records the game version and Steam build number, your screen resolution
+and refresh rate, your GPU name, the Windows build, and the frame rate value the
+game has saved. It also contains the path the game is installed to — feel free to
+delete that line before attaching it if you would rather not share it.
 
 https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
 
