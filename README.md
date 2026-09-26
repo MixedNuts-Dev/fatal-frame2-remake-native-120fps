@@ -82,6 +82,18 @@ The third entry is selectable in the other languages as well, but its label is n
 guaranteed. In Italian the third entry shows an unrelated string — the feature
 itself still works correctly.
 
+## 既知の問題 / Known issues
+
+**120 を選んだあとに画面設定を開き直すと、カーソルが「30」に戻って見えます。**
+表示だけの問題で、実際のフレームレートは 120 のままです。その状態で他の設定を
+変更しても 120 に戻ることはありません（実測で確認済み）。ゲーム本来の処理が、
+カーソル位置を復元するときに 3 つ目の選択肢を想定していないためです。
+
+**After selecting 120, reopening the screen settings shows the cursor back on "30".**
+This is a display issue only — the actual frame rate stays at 120, and changing other
+settings from that state does not reset it (verified by measurement). The game's own
+code does not expect a third entry when it restores the cursor position.
+
 ## ビルド / Build
 
 Visual Studio 2022 の C++ ツールセットが必要です。

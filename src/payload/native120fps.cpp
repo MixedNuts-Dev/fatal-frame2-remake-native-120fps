@@ -22,8 +22,23 @@
 
 namespace {
 
+constexpr char kVersion[] = "1.0.1";
+
 std::wstring g_modDir;
 bool         g_log = true;
+bool         g_diagnose = false;   // ini: Diagnose=1 のときだけ追加の診断を出す
+
+// ログは UTF-8 で書くので、ワイド文字列は明示的に変換する
+// （%ls に任せるとロケール依存で日本語のパスが化ける）
+std::string Utf8(const wchar_t* w)
+{
+    if (!w || !*w) return std::string();
+    const int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
+    if (n <= 1) return std::string();
+    std::string s(static_cast<size_t>(n - 1), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w, -1, &s[0], n, nullptr, nullptr);
+    return s;
+}
 
 void Log(const char* fmt, ...)
 {
@@ -137,46 +152,119 @@ bool GetTextSection(uint8_t*& base, size_t& size)
 
 // ---- パッチ1: メニューハンドラの 2 択ハードコード解除 --------------------
 
-bool PatchMenuHandler()
+// モジュール先頭からの相対位置。ログに出すためだけに使う
+unsigned long long Rva(const void* p)
+{
+    return static_cast<unsigned long long>(
+        static_cast<const uint8_t*>(p) - reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr)));
+}
+
+// 失敗の理由を呼び出し側へ返す。
+//
+// このパッチだけが失敗してテーブル拡張が成功すると、「メニューに 120 は
+// 出るが選ぶと 30FPS になる」という紛らわしい状態になる。1.0.0 では
+// 未発見のときに何もログを出していなかったため、報告されたログから
+// 原因を切り分けられなかった。
+enum class HandlerResult {
+    Pending,            // 初期値（まだ試していない）
+    Ok,                 // 今回パッチした
+    AlreadyPatched,     // 既に当たっている
+    NoTextSection,      // .text が取れない
+    NotFound,           // シグネチャが見つからない（復号前 / バージョン違い）
+    Ambiguous,          // 複数一致したので中止した
+    UnexpectedBytes,    // 当該位置のバイト列が想定外（他の Mod と衝突など）
+    WriteFailed,        // 書き込みに失敗した
+};
+
+const char* HandlerResultName(HandlerResult r)
+{
+    switch (r)
+    {
+    case HandlerResult::Pending:         return "未試行";
+    case HandlerResult::Ok:              return "OK";
+    case HandlerResult::AlreadyPatched:  return "適用済み";
+    case HandlerResult::NoTextSection:   return ".text不明";
+    case HandlerResult::NotFound:        return "未発見";
+    case HandlerResult::Ambiguous:       return "複数一致";
+    case HandlerResult::UnexpectedBytes: return "バイト列不一致";
+    case HandlerResult::WriteFailed:     return "書込失敗";
+    }
+    return "?";
+}
+
+// 32 バイトのシグネチャが当たらなかったときに、錨の 5 バイト
+// (mov edx,0x3B726180) だけで探し直して周辺を 16 進で吐く。
+//
+// ゲームの更新で周辺のコードが変わった場合、この出力があればログだけで
+// 新しいシグネチャを作れる。錨が 0 件なら、そもそも .text が復号されて
+// いないか、別バージョンだと判断できる。
+void DumpSignatureNeighborhood()
 {
     uint8_t* base = nullptr;
     size_t   size = 0;
-    if (!GetTextSection(base, size)) return false;
+    if (!GetTextSection(base, size))
+    {
+        Log("[??] .text が取得できないため診断できません");
+        return;
+    }
+
+    constexpr uint8_t kAnchor[5] = { 0xBA, 0x80, 0x61, 0x72, 0x3B };
+    constexpr size_t  kDump      = 48;
+    int hits = 0;
+    for (size_t i = 0; i + sizeof(kAnchor) <= size; ++i)
+    {
+        if (memcmp(base + i, kAnchor, sizeof(kAnchor)) != 0) continue;
+        ++hits;
+        if (hits > 3) continue;   // 件数は数えるが、出力は 3 件までにする
+
+        const size_t n = (i + kDump <= size) ? kDump : size - i;
+        char hex[kDump * 3 + 1]{};
+        for (size_t k = 0; k < n; ++k)
+            sprintf_s(hex + k * 3, 4, "%02X ", base[i + k]);
+        Log("[??] 錨 %d 件目 RVA 0x%llX: %s", hits, Rva(base + i), hex);
+    }
+
+    Log("[??] 錨 (mov edx,0x3B726180) の一致数: %d 件 / .text %llu bytes",
+        hits, static_cast<unsigned long long>(size));
+    if (hits == 0)
+        Log("[??] 錨が 1 件も無い。Steam DRM の復号前か、ゲームのバージョンが"
+            "異なる可能性があります");
+    else
+        Log("[??] 錨はあるが前後のコードが一致しない。ゲームの更新で"
+            "シグネチャが変わった可能性があります");
+}
+
+HandlerResult PatchMenuHandler()
+{
+    uint8_t* base = nullptr;
+    size_t   size = 0;
+    if (!GetTextSection(base, size)) return HandlerResult::NoTextSection;
 
     uint8_t* found = nullptr;
     for (size_t i = 0; i + kSigLen <= size; ++i)
     {
         if (MatchSig(base + i))
         {
-            if (found)
-            {
-                Log("[NG] シグネチャが複数一致。安全のため中止します");
-                return false;
-            }
+            if (found) return HandlerResult::Ambiguous;
             found = base + i;
         }
     }
-    if (!found) return false;
+    if (!found) return HandlerResult::NotFound;
 
     uint8_t* target = found + kPatchOff;
-    if (memcmp(target, kPatch, sizeof(kPatch)) == 0)
-    {
-        Log("[--] メニューハンドラは適用済み");
-        return true;
-    }
+    if (memcmp(target, kPatch, sizeof(kPatch)) == 0) return HandlerResult::AlreadyPatched;
     if (memcmp(target, kOrig, sizeof(kOrig)) != 0)
     {
-        Log("[NG] 想定外のバイト列。中止します");
-        return false;
+        char hex[sizeof(kOrig) * 3 + 1]{};
+        for (size_t k = 0; k < sizeof(kOrig); ++k)
+            sprintf_s(hex + k * 3, 4, "%02X ", target[k]);
+        Log("[NG] 想定外のバイト列 (RVA 0x%llX): %s", Rva(target), hex);
+        return HandlerResult::UnexpectedBytes;
     }
-    if (!WriteMem(target, kPatch, sizeof(kPatch)))
-    {
-        Log("[NG] 書き込みに失敗しました");
-        return false;
-    }
-    Log("[OK] メニューハンドラを解除 (RVA 0x%llX)",
-        static_cast<unsigned long long>(target - reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr))));
-    return true;
+    if (!WriteMem(target, kPatch, sizeof(kPatch))) return HandlerResult::WriteFailed;
+
+    Log("[OK] メニューハンドラを解除 (RVA 0x%llX)", Rva(target));
+    return HandlerResult::Ok;
 }
 
 // ---- パッチ2: 選択肢を 3 つに拡張 ---------------------------------------
@@ -313,6 +401,86 @@ bool PatchChoiceTable()
     return g_tableDone;
 }
 
+// ---- 環境情報 -----------------------------------------------------------
+//
+// 不具合報告のログから、ゲームのバージョン違いを切り分けるために出す。
+// exe のサイズと更新日時があれば、こちらの検証環境と同じビルドかどうかが
+// 判断できる。
+void LogEnvironment()
+{
+    wchar_t exe[MAX_PATH]{};
+    GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    Log("exe: %s", Utf8(exe).c_str());
+
+    WIN32_FILE_ATTRIBUTE_DATA fad{};
+    if (GetFileAttributesExW(exe, GetFileExInfoStandard, &fad))
+    {
+        const unsigned long long bytes =
+            (static_cast<unsigned long long>(fad.nFileSizeHigh) << 32) | fad.nFileSizeLow;
+        FILETIME   lt{};
+        SYSTEMTIME st{};
+        FileTimeToLocalFileTime(&fad.ftLastWriteTime, &lt);
+        FileTimeToSystemTime(&lt, &st);
+        Log("exe サイズ: %llu bytes / 更新日時: %04d-%02d-%02d %02d:%02d",
+            bytes, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute);
+    }
+
+    uint8_t* base = nullptr;
+    size_t   size = 0;
+    if (GetTextSection(base, size))
+        Log("モジュール: 0x%p / .text: 0x%p (%llu bytes)",
+            GetModuleHandleW(nullptr), base, static_cast<unsigned long long>(size));
+    else
+        Log(".text: 取得できませんでした");
+}
+
+// ---- 任意: FPS インデックスの監視 ---------------------------------------
+//
+// 「120 を選んでも 30FPS になる」という報告の切り分け用。
+// ini の Diagnose=1 のときだけ動く。
+//
+// 読むのは .data 上の 1 バイト（0=30 / 1=60 / 2=120）だけで、書き込みは
+// 一切しない。この領域は実行ファイルのイメージ内にあり解放されないため、
+// 読んでも安全だが、念のため SEH で保護する。
+uintptr_t g_fpsIndexRva = 0x2C31808;
+
+bool ReadByte(const uint8_t* p, uint8_t& out)
+{
+    __try { out = *p; return true; }
+    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+}
+
+void WatchFpsIndex()
+{
+    auto mod = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
+    if (!mod || g_fpsIndexRva == 0) return;
+    const uint8_t* p = mod + g_fpsIndexRva;
+
+    uint8_t cur = 0;
+    if (!ReadByte(p, cur))
+    {
+        Log("[??] FPS インデックス (RVA 0x%llX) を読めませんでした",
+            static_cast<unsigned long long>(g_fpsIndexRva));
+        return;
+    }
+    Log("[??] Diagnose=1: FPS インデックスの監視を開始 (RVA 0x%llX, 現在値 %u"
+        " / 0=30 1=60 2=120)", static_cast<unsigned long long>(g_fpsIndexRva), cur);
+
+    // 15 分まで、5 秒おきに見る。値が変わったときだけ記録する
+    constexpr int kIntervalMs = 5000;
+    constexpr int kMaxSec     = 15 * 60;
+    for (int t = 0; t < kMaxSec; t += kIntervalMs / 1000)
+    {
+        Sleep(kIntervalMs);
+        uint8_t v = 0;
+        if (!ReadByte(p, v)) break;
+        if (v == cur) continue;
+        Log("[??] FPS インデックスが %u -> %u に変化", cur, v);
+        cur = v;
+    }
+    Log("[??] FPS インデックスの監視を終了しました (最終値 %u)", cur);
+}
+
 // ---- 設定読み込み -------------------------------------------------------
 
 void LoadConfig(HMODULE self)
@@ -325,7 +493,10 @@ void LoadConfig(HMODULE self)
 
     const std::wstring ini = dir + L"native120fps.ini";
     g_log      = GetPrivateProfileIntW(L"General", L"Log", 1, ini.c_str()) != 0;
+    g_diagnose = GetPrivateProfileIntW(L"General", L"Diagnose", 0, ini.c_str()) != 0;
     g_labelId  = GetPrivateProfileIntW(L"Patch", L"LabelId", 0x00F92FF0, ini.c_str());
+    g_fpsIndexRva = static_cast<uintptr_t>(
+        GetPrivateProfileIntW(L"Patch", L"FpsIndexRva", 0x2C31808, ini.c_str()));
     if (GetPrivateProfileIntW(L"General", L"Enabled", 1, ini.c_str()) == 0)
     {
         Log("[--] Enabled=0 のため何もしません");
@@ -338,7 +509,8 @@ DWORD WINAPI Worker(LPVOID param)
     LoadConfig(static_cast<HMODULE>(param));
     if (g_labelId == 0) return 0;
 
-    Log("=== Native 120FPS Option / Created by MixedNuts ===");
+    Log("=== Native 120FPS Option %s / Created by MixedNuts ===", kVersion);
+    LogEnvironment();
 
     // Steam DRM の復号とアーカイブのロードを待つ。
     //
@@ -350,12 +522,31 @@ DWORD WINAPI Worker(LPVOID param)
     const uint64_t     startMs      = GetTickCount64();
 
     bool codeDone = false, tableDone = false;
+    HandlerResult last = HandlerResult::Pending;
     int tries = 0;
     while (!(codeDone && tableDone) && tries < kMaxTries &&
            GetTickCount64() - startMs < kDeadlineMs)
     {
         ++tries;
-        if (!codeDone)  codeDone  = PatchMenuHandler();
+        if (!codeDone)
+        {
+            const HandlerResult r = PatchMenuHandler();
+            if (r == HandlerResult::Ok)
+            {
+                codeDone = true;
+            }
+            else if (r == HandlerResult::AlreadyPatched)
+            {
+                Log("[--] メニューハンドラは適用済み");
+                codeDone = true;
+            }
+            else if (r != last)
+            {
+                // 同じ理由を毎回書くとログが埋まるので、変わったときだけ記録する
+                Log("[..] メニューハンドラ未適用: %s (%d 回目)", HandlerResultName(r), tries);
+            }
+            last = r;
+        }
         if (!tableDone)
         {
             const uint64_t t0 = GetTickCount64();
@@ -369,13 +560,41 @@ DWORD WINAPI Worker(LPVOID param)
     }
 
     if (codeDone && tableDone)
+    {
         Log("=== 完了 (%d 回目)。オプション画面の FPS が 3 択になります ===", tries);
+    }
     else
+    {
         Log("=== 打ち切り (%d 回 / %llu ms, コード:%s テーブル:%s) ===",
             tries, static_cast<unsigned long long>(GetTickCount64() - startMs),
-            codeDone ? "OK" : "NG", tableDone ? "OK" : "NG");
+            codeDone ? "OK" : HandlerResultName(last), tableDone ? "OK" : "NG");
 
-    Log("走査を終了しました。以降ゲームには一切触れません。");
+        // 2 つのパッチは独立しているので、片方だけ失敗した状態を明示する。
+        // 特にコードパッチだけ失敗した場合は「120 を選べるのに 30FPS になる」
+        // という紛らわしい症状になるため、ログに書いておく。
+        if (!codeDone && tableDone)
+        {
+            Log("[!!] コードパッチが当たっていません。この状態でメニューの 3 つ目を"
+                "選ぶと 30FPS になります（選択肢だけが増えた状態）");
+            DumpSignatureNeighborhood();
+        }
+        else if (!codeDone)
+        {
+            Log("[!!] コードパッチが当たっていません");
+            DumpSignatureNeighborhood();
+        }
+        if (!tableDone)
+            Log("[!!] 選択肢テーブルが見つかりませんでした。オプションは 2 択のままです");
+    }
+
+    if (g_diagnose)
+    {
+        WatchFpsIndex();
+    }
+    else
+    {
+        Log("走査を終了しました。以降ゲームには一切触れません。");
+    }
     return 0;
 }
 

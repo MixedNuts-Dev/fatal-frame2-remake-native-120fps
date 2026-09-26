@@ -99,8 +99,14 @@ Created by MixedNuts
 |---|---|
 | `Enabled` | `1` = 有効 / `0` = 無効 |
 | `Log` | `1` = ログを出力 / `0` = 出力しない |
+| `Diagnose` | `1` = 不具合報告用の追加診断を出力 / `0` = 出力しない（既定） |
 
-`LabelId` という項目もありますが、これは内部的な値なので通常は変更する必要はありません。
+`Diagnose` は、**不具合を報告するときだけ** `1` にしてください。パッチ後 15 分間、
+ゲーム側のフレームレート番号を監視してログに記録します。読み取るのは 1 バイト
+だけで、ゲームへの書き込みは一切行いません。
+
+`LabelId` と `FpsIndexRva` という項目もありますが、これらは内部的な値なので
+通常は変更する必要はありません。
 
 ## 免責事項
 
@@ -114,6 +120,18 @@ Created by MixedNuts
 ```
 %LOCALAPPDATA%\KoeiTecmo\FatalFrameII\Savedata\
 ```
+
+## 既知の問題
+
+**120 を選んだあとに画面設定を開き直すと、カーソルが「30」に戻って見えます。**
+
+表示だけの問題です。**実際のフレームレートは 120 のまま**で、その状態から他の
+設定を変更しても 120 に戻ることはありません（実測で確認済み）。設定ファイルにも
+120 が保存され続けます。
+
+ゲーム本来の処理が、カーソル位置を復元するときに 3 つ目の選択肢を想定して
+いないためです。実フレームレートは NVIDIA / AMD のオーバーレイなどで確認して
+ください。
 
 ## 注意事項
 
@@ -150,6 +168,27 @@ Created by MixedNuts
 なお Mod は起動から数秒かけて適用されます。**タイトル画面まで進んでから**
 オプションを開いてください。
 
+### 「120」を選んでも 30FPS のままの場合
+
+まず上の「既知の問題」を確認してください。**カーソルが 30 に見えるだけで、実際は
+120 で動いていることがあります。**オーバーレイなどで実測値を確認してください。
+
+実測でも 30FPS だった場合、次の順に確認してください。**性能不足なら 70〜90FPS の
+ように値が揺れます。きっちり 30 に張り付く場合は、どこかで上限が掛かっています。**
+
+1. `native120fps.log` の最終行が `=== 完了 ===` になっているか。
+   `コード:未発見 テーブル:OK` のようになっていれば、パッチが片方しか
+   当たっていません（この状態だと 3 つ目を選ぶと 30FPS になります）
+2. NVIDIA コントロールパネルの **垂直同期**が「アダプティブ（ハーフリフレッシュ
+   レート）」になっていないか。60Hz のディスプレイではちょうど 30FPS になります
+3. 同じ画面の **「最大フレームレート」**が低い値に設定されていないか
+4. Windows の画面設定で、リフレッシュレートが実際に 120Hz 以上になっているか
+   （対応していても 60Hz のままになっていることがあります）
+5. ゲーム内の **Vsync が無効**になっているか
+6. 過去に `graphics_option.json` を書き換える Mod を使っていた場合、ファイルが
+   **読み取り専用のまま残っていないか**。読み取り専用だと設定を保存できません
+7. ムービーシーンで測っていないか（プリレンダのムービーは 30FPS が仕様です）
+
 ## 不具合の報告
 
 不具合を見つけた場合は、GitHub の Issue でご報告ください。その際、**必ず
@@ -163,6 +202,9 @@ https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
 - ゲームのバージョン
 - GPU とディスプレイのリフレッシュレート
 - 発生した状況（どの画面で、何をしたとき）
+
+フレームレートに関する不具合の場合は、`native120fps.ini` の `Diagnose` を `1` に
+してから再現し、そのログを添付していただけると原因が特定しやすくなります。
 
 ## 仕組み
 
@@ -287,9 +329,14 @@ To disable temporarily without deleting anything, set `Enabled` to `0` in
 |---|---|
 | `Enabled` | `1` = on / `0` = off |
 | `Log` | `1` = write a log file / `0` = no log |
+| `Diagnose` | `1` = write extra diagnostics / `0` = don't (default) |
 
-There is also a `LabelId` entry. It is an internal value and normally does not
-need to be changed.
+Set `Diagnose` to `1` **only when reporting a bug.** For 15 minutes after patching
+it watches the game's frame rate index and logs it. It only reads a single byte and
+never writes anything to the game.
+
+There are also `LabelId` and `FpsIndexRva` entries. They are internal values and
+normally do not need to be changed.
 
 ## Disclaimer
 
@@ -303,6 +350,17 @@ Save data is located at:
 ```
 %LOCALAPPDATA%\KoeiTecmo\FatalFrameII\Savedata\
 ```
+
+## Known issues
+
+**After selecting 120, reopening the screen settings shows the cursor back on "30".**
+
+This is a display issue only. **The actual frame rate stays at 120**, and changing
+other settings from that state does not reset it (verified by measurement) — the
+settings file keeps 120 as well.
+
+The game's own code does not expect a third entry when it restores the cursor
+position. Use an overlay (NVIDIA, AMD, Steam) to check the real frame rate.
 
 ## Notes
 
@@ -342,6 +400,28 @@ If the log contains these lines, the patch was applied correctly:
 Note that the mod takes a few seconds after launch to apply. **Reach the title
 screen** before opening the options menu.
 
+### If you selected 120 but still get 30 FPS
+
+First check "Known issues" above. **The cursor can look like it is on 30 while the
+game is actually running at 120.** Confirm the real frame rate with an overlay.
+
+If you really are measuring 30 FPS, check the following in order. **A performance
+shortfall gives you a fluctuating 70-90 FPS; a rock-steady 30 means something is
+capping it.**
+
+1. Does the last line of `native120fps.log` read `=== 完了 ===`? If it reads
+   something like `コード:未発見 テーブル:OK`, only one of the two patches
+   applied — in that state, picking the third entry does give you 30 FPS
+2. In the NVIDIA Control Panel, is **Vertical sync** set to "Adaptive (half refresh
+   rate)"? On a 60 Hz display that caps the game at exactly 30 FPS
+3. On the same page, is **"Max Frame Rate"** set to a low value?
+4. In Windows display settings, is the refresh rate actually set to 120 Hz or
+   higher? (A display can support it while still running at 60 Hz)
+5. Is **V-Sync off** in the game?
+6. If you previously used a mod that edits `graphics_option.json`, is that file
+   still **read-only**? The game cannot save your choice if it is
+7. Were you measuring during a cutscene? Pre-rendered movies run at 30 FPS by design
+
 ## Reporting issues
 
 If you run into a problem, please open a GitHub Issue. **Be sure to attach
@@ -355,6 +435,9 @@ The following details also help:
 - Game version
 - GPU and display refresh rate
 - What you were doing when it happened
+
+For frame rate problems, please set `Diagnose` to `1` in `native120fps.ini`,
+reproduce the issue, and attach that log — it makes the cause much easier to find.
 
 ## How it works
 
