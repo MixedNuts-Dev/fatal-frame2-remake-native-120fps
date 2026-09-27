@@ -1,14 +1,18 @@
 // FATAL FRAME II: Crimson Butterfly REMAKE — Native 120FPS Option
-// Created by MixedNuts - https://github.com/MixedNuts-Dev/fatal-frame2-remake-mods
+// Created by MixedNuts - https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps
 // Licensed under the MIT License. See LICENSE for details.
 //
 // ゲーム本体は Steam DRM により .text が暗号化されているため、ファイルへの
 // 静的パッチはできない。復号後のメモリに対して実行時にパッチを当てる。
 //
-// 行うことは 2 つ:
-//   1) メニューの FPS 項目ハンドラが選択インデックス 0/1 しか受け付けない
-//      ハードコードを解除する（8 バイト）
-//   2) OPTION_MENU_SELECT_ECB の FPS 行を 2 択 → 3 択に拡張する
+// ここで行うのは 1 つだけ:
+//   メニューの FPS 項目ハンドラが選択インデックス 0/1 しか受け付けない
+//   ハードコードを解除する（8 バイト）
+//
+// 選択肢を 3 つに増やす処理と、3 つ目のラベルを "120" にする処理は、
+// ローダ側が archive_01.lnk / archive_06.lnk の改変版を用意して行う。
+// 1.0.2 までは選択肢テーブルをメモリ上で探していたが、ゲームが確保する
+// 4〜8GB の領域を走査する必要があり、適用まで最悪 17 秒かかっていた。
 //
 // ゲームのファイルは一切変更しない。
 //
@@ -21,15 +25,14 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <algorithm>
-#include <utility>
 
 namespace {
 
-constexpr char kVersion[] = "1.0.2";
+constexpr char kVersion[] = "1.1.0";
 
 std::wstring g_modDir;
-bool         g_log = true;
+bool         g_enabled  = true;
+bool         g_log      = true;
 bool         g_diagnose = false;   // ini: Diagnose=1 のときだけ追加の診断を出す
 
 // ログは UTF-8 で書くので、ワイド文字列は明示的に変換する
@@ -92,8 +95,8 @@ constexpr uint8_t kMask[] = {
     0, 1, 1, 1, 0, 0, 0, 0,
     1, 1, 1, 1, 1, 1, 1, 1,
 };
-constexpr size_t kSigLen    = sizeof(kSig);
-constexpr size_t kPatchOff  = 0x18;
+constexpr size_t kSigLen   = sizeof(kSig);
+constexpr size_t kPatchOff = 0x18;
 
 // 錨だけを切り出したもの（mov edx,0x3B726180）
 constexpr uint8_t kAnchor[5] = { 0xBA, 0x80, 0x61, 0x72, 0x3B };
@@ -103,6 +106,16 @@ constexpr uint8_t kAnchor[5] = { 0xBA, 0x80, 0x61, 0x72, 0x3B };
 // 残りを u32 で一度に比べる。memcmp を毎バイト呼ぶと桁違いに遅い。
 constexpr uint8_t  kAnchorOp  = 0xBA;          // mov edx,imm32
 constexpr uint32_t kAnchorImm = 0x3B726180u;   // OPTION_MENU_ITEM_ECB の FPS 項目 ID
+
+// 錨の直後から、この範囲内で対象のバイト列を探す。
+// 本来の距離は 0x18 なので、命令が数個挿入されても届く幅を取る。
+constexpr size_t kRelaxedWindow = 0x60;
+
+const uint8_t kOrig[8]  = { 0x83, 0xF8, 0x01, 0x75, 0x03, 0x0F, 0xB6, 0xD8 };
+// movzx ebx,al ; nop x5  → 選択インデックスをそのまま採用する
+const uint8_t kPatch[8] = { 0x0F, 0xB6, 0xD8, 0x90, 0x90, 0x90, 0x90, 0x90 };
+
+// ---- ユーティリティ -----------------------------------------------------
 
 inline uint32_t Read32(const uint8_t* p)
 {
@@ -115,29 +128,6 @@ inline bool IsAnchor(const uint8_t* p)
 {
     return p[0] == kAnchorOp && Read32(p + 1) == kAnchorImm;
 }
-
-// 錨の直後から、この範囲内で対象のバイト列を探す。
-// 本来の距離は 0x18 なので、命令が数個挿入されても届く幅を取る。
-constexpr size_t kRelaxedWindow = 0x60;
-
-const uint8_t kOrig[8]  = { 0x83, 0xF8, 0x01, 0x75, 0x03, 0x0F, 0xB6, 0xD8 };
-// movzx ebx,al ; nop x5  → 選択インデックスをそのまま採用する
-const uint8_t kPatch[8] = { 0x0F, 0xB6, 0xD8, 0x90, 0x90, 0x90, 0x90, 0x90 };
-
-// OPTION_MENU_SELECT_ECB の FPS 行（sel r30）: 選択肢1="30" の ID に続いて "60" の ID
-constexpr uint32_t kId30 = 0x00D24344;
-constexpr uint32_t kId60 = 0x00CB7EE4;
-
-// 3つ目の選択肢に使うラベル ID（ini で変更可）
-//
-// 0x00D9E01F は MES_MENU の通し番号 257 に対応する。この ID を参照している
-// OPTION_MENU_SELECT_ECB の行（sel r36）はどの項目からも参照されておらず、
-// ゲーム中のどこにも表示されないため、流用しても副作用がない。
-// 実際に "120" と表示させるための文字列の差し替えは、ローダ側が
-// archive_06.lnk の改変版を用意して行う。
-uint32_t g_labelId = 0x00D9E01F;
-
-// ---- ユーティリティ -----------------------------------------------------
 
 bool WriteMem(void* addr, const void* data, size_t len)
 {
@@ -446,14 +436,12 @@ void LogEnvironment()
     LogGraphicsOption();
 }
 
-// ---- パッチ1: メニューハンドラの 2 択ハードコード解除 --------------------
+// ---- メニューハンドラの 2 択ハードコード解除 ----------------------------
 
 // 失敗の理由を呼び出し側へ返す。
 //
-// このパッチだけが失敗してテーブル拡張が成功すると、「メニューに 120 は
-// 出るが選ぶと 30FPS になる」という紛らわしい状態になる。1.0.0 では
-// 未発見のときに何もログを出していなかったため、報告されたログから
-// 原因を切り分けられなかった。
+// 1.0.0 では未発見のときに何もログを出していなかったため、報告された
+// ログから原因を切り分けられなかった。
 enum class HandlerResult {
     Pending,            // 初期値（まだ試していない）
     Ok,                 // 今回パッチした
@@ -621,157 +609,6 @@ HandlerResult PatchMenuHandler()
     return HandlerResult::Ok;
 }
 
-// ---- パッチ2: 選択肢を 3 つに拡張 ---------------------------------------
-
-// ECB ブロック先頭からの相対位置:
-//   0x20（ヘッダ） + 30行 * 56バイト + 8（col2 = 選択肢1）= 0x6B8
-constexpr size_t kEcbHeaderBack = 0x6B8;
-
-// 領域の読み取りは他スレッドの解放と競合しうるので SEH で保護する。
-// 例外が起きたらその領域を諦めて次へ進む。
-bool ScanRegion(uint8_t* p, size_t n, size_t start, const uint8_t*, size_t& foundOff)
-{
-    __try
-    {
-        // 4 バイト境界に並ぶので u32 として比較する。
-        // まず 1 つ目の ID だけ見て、当たったときだけ 2 つ目を確認する。
-        auto q = reinterpret_cast<const uint32_t*>(p);
-        const size_t cnt = n / 4;
-        for (size_t i = start / 4; i + 1 < cnt; ++i)
-        {
-            if (q[i] == kId30 && q[i + 1] == kId60)
-            {
-                foundOff = i * 4;
-                return true;
-            }
-        }
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) {}
-    return false;
-}
-
-bool g_tableDone = false;   // 選択肢テーブルの拡張済みフラグ
-
-// 直前の走査の規模。
-//
-// この走査だけ 1 パスに 10 秒以上かかることがあり、時間だけ見ていても
-// 「コードが遅いのか、対象が増えたのか」を区別できなかった。
-//
-// 見つけた時点で打ち切るので、「入った領域数」と「候補全体の量」は
-// 別物になる。両方出さないと、94ms で 4GB 走査したように読めてしまう。
-size_t g_visitedRegions = 0;   // 実際に入った領域数
-size_t g_candRegions    = 0;   // 候補の領域数
-unsigned long long g_candBytes = 0;   // 候補の総バイト数
-
-// 偽ヒット（スタック上の一時コピーなど）を排除するため、
-// ブロック先頭が 'ecb\0' であることを確認する。
-bool LooksLikeEcb(uint8_t* slot1)
-{
-    __try
-    {
-        uint8_t* h = slot1 - kEcbHeaderBack;
-        return h[0] == 'e' && h[1] == 'c' && h[2] == 'b' && h[3] == 0;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
-}
-
-// 候補領域をサイズの大きい順に見る。
-//
-// アーカイブは数GB規模の巨大な確保領域の中にあり、小さな領域が多数あるため、
-// 素直に番地順で舐めると目的の領域に辿り着くまでが遅い。大きい方から見れば
-// 通常は最初の領域で見つかる。
-//
-// 「各領域の先頭だけを見る」という絞り方も試したが、候補領域が多いため
-// 1周に数秒かかるうえ、アーカイブが先頭付近にあるとは限らず逆効果だった。
-bool PatchChoiceTable()
-{
-    SYSTEM_INFO si{};
-    GetSystemInfo(&si);
-    auto addr = reinterpret_cast<uint8_t*>(si.lpMinimumApplicationAddress);
-    auto maxA = reinterpret_cast<uint8_t*>(si.lpMaximumApplicationAddress);
-
-    uint8_t pattern[8];
-    memcpy(pattern, &kId30, 4);
-    memcpy(pattern + 4, &kId60, 4);
-
-    // まず候補領域を集める
-    std::vector<std::pair<uint8_t*, size_t>> cands;
-    MEMORY_BASIC_INFORMATION mbi{};
-    while (addr < maxA && VirtualQuery(addr, &mbi, sizeof(mbi)) == sizeof(mbi))
-    {
-        const DWORD prot = mbi.Protect & 0xFF;
-        const bool readable = mbi.State == MEM_COMMIT && !(mbi.Protect & PAGE_GUARD) &&
-                              (prot == PAGE_READONLY || prot == PAGE_READWRITE ||
-                               prot == PAGE_WRITECOPY);
-        // 走査対象を絞る。
-        // アーカイブは MEM_PRIVATE / READWRITE の巨大な確保領域の中にある
-        // （実測で約 4.1GB の単一領域だった）。上限を小さく取ると目的の領域ごと
-        // 除外してしまうので、上限は十分に大きく取る。
-        // イメージ領域とマップド領域は対象外のままにして、触る範囲は抑える。
-        const bool candidate = readable && mbi.Type == MEM_PRIVATE &&
-                               mbi.RegionSize >= 0x10000 &&
-                               mbi.RegionSize <= (8ull << 30);
-        if (candidate)
-            cands.emplace_back(static_cast<uint8_t*>(mbi.BaseAddress), mbi.RegionSize);
-
-        auto next0 = static_cast<uint8_t*>(mbi.BaseAddress) + mbi.RegionSize;
-        if (next0 <= addr) break;
-        addr = next0;
-    }
-
-    // 大きい領域から先に見る
-    std::sort(cands.begin(), cands.end(),
-              [](const std::pair<uint8_t*, size_t>& a,
-                 const std::pair<uint8_t*, size_t>& b) { return a.second > b.second; });
-
-    g_visitedRegions = 0;
-    g_candRegions    = cands.size();
-    g_candBytes      = 0;
-    for (const auto& c : cands) g_candBytes += c.second;
-
-    for (const auto& c : cands)
-    {
-        {
-            uint8_t* const p = c.first;
-            const size_t n = c.second;
-            ++g_visitedRegions;
-
-            size_t at = 0;
-            while (ScanRegion(p, n, at, pattern, at))
-            {
-                uint8_t* slot1 = p + at;
-                at += 4;
-                if (!LooksLikeEcb(slot1)) continue;   // ECB でなければ無視
-
-                auto count = reinterpret_cast<uint32_t*>(slot1 - 4);
-                auto slot3 = reinterpret_cast<uint32_t*>(slot1 + 8);
-                if (*count == 3 && *slot3 == g_labelId)
-                {
-                    Log("[--] Choice table already patched (0x%p)", count);
-                    g_tableDone = true;
-                    break;
-                }
-                if (*count != 2) continue;
-
-                const uint32_t three = 3;
-                if (WriteMem(count, &three, 4) && WriteMem(slot3, &g_labelId, 4))
-                {
-                    Log("[OK] Choice table extended to 3 entries (0x%p, label ID 0x%08X)",
-                        count, g_labelId);
-                    g_tableDone = true;
-                }
-                else
-                {
-                    Log("[NG] Failed to write the choice table");
-                }
-                break;
-            }
-        }
-        if (g_tableDone) break;
-    }
-    return g_tableDone;
-}
-
 // ---- 任意: FPS インデックスの監視 ---------------------------------------
 //
 // 「120 を選んでも 30FPS になる」という報告の切り分け用。
@@ -832,101 +669,64 @@ void LoadConfig(HMODULE self)
     const std::wstring ini = dir + L"native120fps.ini";
     g_log      = GetPrivateProfileIntW(L"General", L"Log", 1, ini.c_str()) != 0;
     g_diagnose = GetPrivateProfileIntW(L"General", L"Diagnose", 0, ini.c_str()) != 0;
-    g_labelId  = GetPrivateProfileIntW(L"Patch", L"LabelId", 0x00F92FF0, ini.c_str());
+    g_enabled  = GetPrivateProfileIntW(L"General", L"Enabled", 1, ini.c_str()) != 0;
     g_fpsIndexRva = static_cast<uintptr_t>(
         GetPrivateProfileIntW(L"Patch", L"FpsIndexRva", 0x2C31808, ini.c_str()));
-    if (GetPrivateProfileIntW(L"General", L"Enabled", 1, ini.c_str()) == 0)
-    {
-        Log("[--] Enabled=0, doing nothing");
-        g_labelId = 0;   // 無効の印
-    }
 }
 
 DWORD WINAPI Worker(LPVOID param)
 {
     LoadConfig(static_cast<HMODULE>(param));
-    if (g_labelId == 0) return 0;
+    if (!g_enabled)
+    {
+        Log("[--] Enabled=0, doing nothing");
+        return 0;
+    }
 
     Log("=== Native 120FPS Option %s / Created by MixedNuts ===", kVersion);
     LogEnvironment();
 
-    // Steam DRM の復号とアーカイブのロードを待つ。
-    //
-    // 走査は必ず有限回で打ち切る。1 回のメモリ走査に数秒かかるため、
-    // 回数だけでなく実時間でも上限を設ける。ゲームプレイ中に走査が
-    // 動き続けると、解放中のメモリに触れて巻き添えでクラッシュする。
-    constexpr int      kMaxTries    = 20;
-    constexpr uint64_t kDeadlineMs  = 90 * 1000;
-    const uint64_t     startMs      = GetTickCount64();
+    // Steam DRM が .text を復号し終えるのを待つ。
+    // 走査は .text だけ（実測 33MB / 15ms 程度）なので軽いが、
+    // 念のため回数と実時間の両方で必ず打ち切る。
+    constexpr int      kMaxTries   = 30;
+    constexpr uint64_t kDeadlineMs = 60 * 1000;
+    const uint64_t     startMs     = GetTickCount64();
 
-    bool codeDone = false, tableDone = false;
+    bool codeDone = false;
     HandlerResult last = HandlerResult::Pending;
     int tries = 0;
-    while (!(codeDone && tableDone) && tries < kMaxTries &&
+    while (!codeDone && tries < kMaxTries &&
            GetTickCount64() - startMs < kDeadlineMs)
     {
         ++tries;
-        if (!codeDone)
-        {
-            // 錨の走査にかかった時間も出す。ここが遅いと起動直後の
-            // オプション画面に間に合わなくなるので、実測値を残しておく。
-            const uint64_t t0 = GetTickCount64();
-            const HandlerResult r = PatchMenuHandler();
-            const unsigned long long ms = GetTickCount64() - t0;
+        const uint64_t t0 = GetTickCount64();
+        const HandlerResult r = PatchMenuHandler();
+        const unsigned long long ms = GetTickCount64() - t0;
 
-            // 同じ理由を毎回書くとログが埋まるので、初回と、変わったとき、
-            // 成功したときだけ記録する
-            if (tries == 1 || r != last || r == HandlerResult::Ok)
-                Log("[..] Code scan %d: %llu ms (%s)", tries, ms, HandlerResultName(r));
+        // 同じ理由を毎回書くとログが埋まるので、初回と、変わったとき、
+        // 成功したときだけ記録する
+        if (tries == 1 || r != last || r == HandlerResult::Ok)
+            Log("[..] Code scan %d: %llu ms (%s)", tries, ms, HandlerResultName(r));
 
-            if (r == HandlerResult::Ok || r == HandlerResult::AlreadyPatched)
-                codeDone = true;
-            last = r;
-        }
-        if (!tableDone)
-        {
-            const uint64_t t0 = GetTickCount64();
-            tableDone = PatchChoiceTable();
-            Log("[..] Scan %d: %llu ms, visited %llu of %llu regions"
-                " (%llu MB of candidates) (%s)", tries,
-                static_cast<unsigned long long>(GetTickCount64() - t0),
-                static_cast<unsigned long long>(g_visitedRegions),
-                static_cast<unsigned long long>(g_candRegions),
-                g_candBytes >> 20,
-                tableDone ? "found" : "not found");
-        }
-        if (codeDone && tableDone) break;
-        Sleep(1000);
+        if (r == HandlerResult::Ok || r == HandlerResult::AlreadyPatched)
+            codeDone = true;
+        last = r;
+        if (!codeDone) Sleep(500);
     }
 
-    if (codeDone && tableDone)
+    if (codeDone)
     {
         Log("=== Done (attempt %d). The FPS option now has three entries ===", tries);
     }
     else
     {
-        Log("=== Gave up (%d attempts / %llu ms, code: %s, table: %s) ===",
+        Log("=== Gave up (%d attempts / %llu ms, code: %s) ===",
             tries, static_cast<unsigned long long>(GetTickCount64() - startMs),
-            codeDone ? "OK" : HandlerResultName(last), tableDone ? "OK" : "failed");
-
-        // 2 つのパッチは独立しているので、片方だけ失敗した状態を明示する。
-        // 特にコードパッチだけ失敗した場合は「120 を選べるのに 30FPS になる」
-        // という紛らわしい症状になるため、ログに書いておく。
-        if (!codeDone && tableDone)
-        {
-            Log("[!!] The code patch did NOT apply, only the menu entry was added."
-                " Selecting the third entry will give you 30 FPS. This is the"
-                " cause if 120 appears in the menu but will not stay selected.");
-            DumpAnchors();
-        }
-        else if (!codeDone)
-        {
-            Log("[!!] The code patch did NOT apply.");
-            DumpAnchors();
-        }
-        if (!tableDone)
-            Log("[!!] The choice table was not found, so the option still has"
-                " only two entries.");
+            HandlerResultName(last));
+        Log("[!!] The code patch did NOT apply. The third entry will still appear"
+            " in the menu, but selecting it will give you 30 FPS.");
+        DumpAnchors();
     }
 
     if (g_diagnose)

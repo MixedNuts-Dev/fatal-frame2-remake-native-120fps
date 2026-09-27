@@ -53,14 +53,16 @@ FatalFrameII/
   Mods/native120fps/native120fps.ini
   Mods/native120fps/README.md
   Mods/native120fps/native120fps.log   <- 起動時に生成 / generated at launch
+  Mods/native120fps/archive_01.lnk     <- 初回起動時に生成 / generated on first launch
+  Mods/native120fps/archive_01.lnk.tag
   Mods/native120fps/archive_06.lnk     <- 初回起動時に生成 / generated on first launch
   Mods/native120fps/archive_06.lnk.tag
 ```
 
-`archive_06.lnk` は初回起動時に Mod が自動生成します（約 9MB）。ゲーム側の
+2 つの `.lnk` は初回起動時に Mod が自動生成します（合計 約 17MB）。ゲーム側の
 同名ファイルには一切手を加えません。
-`archive_06.lnk` (about 9 MB) is generated automatically on first launch. The game's
-own copy of that file is never touched.
+The two `.lnk` files (about 17 MB in total) are generated automatically on first
+launch. The game's own copies are never touched.
 
 ゲームを起動し、オプション → グラフィック設定を開くと、最大 FPS が 3 択になります。
 3 つ目を選び、タイトル画面まで戻ると反映されます。
@@ -107,43 +109,72 @@ build.bat
 
 ## 仕組み / How it works
 
-実行ファイルは Steam DRM により `.text` が暗号化されているため、**ファイルへの静的
-パッチはできません。** 起動後に復号されたメモリへ実行時にパッチを当てています。
-
-The executable's `.text` section is encrypted by Steam DRM, so **it cannot be patched
-as a file.** The patch is applied to the decrypted code in memory after launch.
-
 行っているのは次の 3 つだけです。 / Only three changes are made:
 
 1. メニューの FPS 項目ハンドラが選択インデックス 0 と 1 しか受け付けない
-   ハードコードを解除する（8 バイト）
-   Remove the hardcoded check that accepts only selection index 0 and 1 (8 bytes).
+   ハードコードを解除する（8 バイト。メモリ上）
+   Remove the hardcoded check that accepts only selection index 0 and 1
+   (8 bytes, in memory).
 2. 選択肢の定義テーブル（`OPTION_MENU_SELECT_ECB`）を 2 択から 3 択に拡張する
    Extend the choice table (`OPTION_MENU_SELECT_ECB`) from two entries to three.
 3. 3 つ目のラベルを「120」と表示させる
    Make the third entry display `120`.
 
-3 番目のラベルだけはメモリ上への書き込みでは足りません。ゲームがメッセージ
-ブロックを同じアドレスへ読み直すため、書き込んでも元へ戻ってしまいます。
-そこで、メッセージを収めた `archive\archive_06.lnk` を **ユーザー自身の
-ゲームフォルダから読み取り、未使用の文字列枠を「120」に書き換えた複製を
+### コードパッチ / The code patch
+
+実行ファイルは Steam DRM により `.text` が暗号化されているため、**ファイルへの静的
+パッチはできません。** 起動後に復号されたメモリへ実行時にパッチを当てています。
+書き込むのは **8 バイトだけ**です。
+
+The executable's `.text` section is encrypted by Steam DRM, so **it cannot be patched
+as a file.** The patch is applied to the decrypted code in memory after launch.
+**Only 8 bytes** are written.
+
+### データ側はファイルの差し替え / The data side is a file redirect
+
+上記 2 と 3 はアーカイブ内のデータなので、メモリ上への書き込みでは足りません。
+ゲームがブロックを同じアドレスへ読み直すため、書き込んでも元へ戻ってしまいます。
+
+Changes 2 and 3 are archive data, and writing to memory is not enough: the game
+reloads those blocks into the same address, so any write is undone.
+
+そこで、**ユーザー自身のゲームフォルダから読み取った内容を書き換えた複製を
 `Mods\native120fps\` 内に生成**し、`CreateFileW` を横取りしてそちらを読ませています。
 ゲーム側のファイルは読むだけで、書き換えません。
 
-The third label cannot be handled in memory alone: the game reloads the message block
-into the same address, so any write is undone. Instead the mod **reads
-`archive\archive_06.lnk` from the user's own game folder, writes a copy with the
-unused string slot replaced by `120` into `Mods\native120fps\`**, and hooks
-`CreateFileW` so the game opens that copy. The game's own file is only read, never
-written.
+Instead the mod **reads the files from the user's own game folder, writes modified
+copies into `Mods\native120fps\`**, and hooks `CreateFileW` so the game opens those
+copies. The game's own files are only read, never written.
+
+| ファイル / File | 書き換える内容 / What is changed |
+|---|---|
+| `archive\archive_01.lnk` | 選択肢数を 2 → 3、3 つ目に未使用の文字列 ID を入れる / choice count 2 to 3, plus an unused string ID for the third entry |
+| `archive\archive_06.lnk` | 未使用の文字列枠を「120」にする / an unused string slot becomes `120` |
 
 配布物に改変済みのゲームデータは含まれません。複製はユーザーの環境で生成されます。
-No modified game data is redistributed; the copy is generated on the user's machine.
+No modified game data is redistributed; the copies are generated on the user's machine.
 
-書き換え先の文字列枠は、空であるか既知のプレースホルダであることを確認してから
-書き込みます。他の用途で使われている言語（イタリア語）では書き込みを見送ります。
-A slot is only written when it is empty or holds the known placeholder. Languages
-where the slot is already in use (Italian) are skipped.
+書き換え先は、決め打ちのアドレスではなく**内容で探し、裏取りしてから書き込みます。**
+選択肢テーブルは ID の並びを探して ECB ブロック先頭の `ecb\0` で確認し、**候補が
+ちょうど 1 件でなければ中止**します。文字列枠は、空であるか既知のプレースホルダで
+あることを確認してから書き込み、他の用途で使われている言語（イタリア語）では
+見送ります。
+
+Targets are located **by content rather than hardcoded offsets, and verified before
+anything is written.** The choice table is found by its ID sequence and confirmed
+against the `ecb\0` block header; **if there is not exactly one candidate, the mod
+aborts.** A string slot is only written when it is empty or holds the known
+placeholder, and languages where it is already in use (Italian) are skipped.
+
+> 1.0.2 までは選択肢テーブルをメモリ上で探していました。ゲームが確保する 4〜8GB の
+> 領域を走査する必要があり、ロード中に踏むと 1 パスに 13 秒かかるうえ、走査が
+> ゲームの作業セットを強制的に常駐させていました。1.1.0 でファイル差し替えに
+> 変更し、走査そのものが不要になりました。
+>
+> Up to 1.0.2 the choice table was located by scanning memory. That meant sweeping the
+> 4-8 GB the game allocates, a single pass could take 13 seconds if it landed while the
+> game was loading, and the scan forced the game's working set resident. 1.1.0 moved it
+> to the file redirect, removing the scan entirely.
 
 パッチ位置はアドレス直指定ではなく AOB スキャンで探します。錨にしているのは
 `mov edx, 0x3B726180`（`OPTION_MENU_ITEM_ECB` の FPS 項目 ID）で、これは非常に
@@ -187,8 +218,8 @@ Save data is located at:
   A game update may change the signature and break this mod.
 - 他プロセスのメモリを書き換えるため、ウイルス対策ソフトが誤検知することがあります
   Antivirus software may flag it, since it writes to another process's memory.
-- 初回起動時に約 9MB の作業用ファイルを Mod 自身のフォルダ内に生成します
-  About 9 MB of working data is generated inside the mod's own folder on first launch.
+- 初回起動時に約 17MB の作業用ファイルを Mod 自身のフォルダ内に生成します
+  About 17 MB of working data is generated inside the mod's own folder on first launch.
 
 ## 不具合の報告 / Reporting issues
 

@@ -22,7 +22,7 @@ Created by MixedNuts
 - FATAL FRAME II: Crimson Butterfly REMAKE（Steam 版）
 - 120Hz 以上に対応したディスプレイ
 - 120FPS を維持できる PC 性能
-- 空きディスク容量 約 10MB（初回起動時に作業用ファイルを生成します）
+- 空きディスク容量 約 20MB（初回起動時に作業用ファイルを生成します）
 
 ゲームのファイルは一切変更しないため、Steam のファイル整合性チェックに
 引っかかることはありません。
@@ -47,13 +47,14 @@ Created by MixedNuts
 このうち **`dinput8.dll` と `Mods` フォルダの 2 つ**をコピーします。
 
 初回起動時に、Mod が `Mods\native120fps\` の中へ次のファイルを自動生成します。
-どちらも削除して問題ありません（次回起動時に作り直されます）。
+いずれも削除して問題ありません（次回起動時に作り直されます）。
 
 | ファイル | 役割 |
 |---|---|
 | `native120fps.log` | ログ |
+| `archive_01.lnk` | 選択肢を 3 つにするための作業ファイル（約 8MB） |
 | `archive_06.lnk` | 表示ラベル差し替え用の作業ファイル（約 9MB） |
-| `archive_06.lnk.tag` | 上記の世代管理用 |
+| `*.lnk.tag` | 上記の世代管理用 |
 
 ## 導入方法
 
@@ -138,7 +139,7 @@ Created by MixedNuts
 - 120FPS を出すには相応の PC 性能と、120Hz 以上に対応したディスプレイが必要です
 - 垂直同期を切らないとモニタのリフレッシュレートで頭打ちになります
 - ゲームのアップデート後に動かなくなることがあります。その場合は Mod の更新をお待ちください
-- 初回起動時に約 9MB の作業用ファイルを `Mods\native120fps\` の中に生成します。
+- 初回起動時に約 17MB の作業用ファイルを `Mods\native120fps\` の中に生成します。
   ゲーム側のファイルは読み取るだけで、書き換えません
 - ウイルス対策ソフトが誤検知することがあります。他プロセスのメモリを書き換える
   仕組みのためで、この Mod はネットワーク通信を一切行わず、ファイルを書き込むのも
@@ -159,16 +160,17 @@ Created by MixedNuts
 ログに次の行が出ていれば正常に適用されています。
 
 ```
-[OK] Generated patched archive_06.lnk
 [OK] Menu handler unlocked
-[OK] Choice table extended to 3 entries
-=== Done (attempt 3). The FPS option now has three entries ===
+=== Done (attempt 2). The FPS option now has three entries ===
+[OK] Generated patched archive_01.lnk
+[OK] Generated patched archive_06.lnk
 ```
 
-ログは英語で出力されます。
+ログは英語で出力されます。行の順序は前後することがあります（アーカイブの
+生成は、ゲームがそのファイルを開いた時点で行われます）。
 
-なお Mod は起動から数秒かけて適用されます。**タイトル画面まで進んでから**
-オプションを開いてください。
+なお、選択肢が増えるのはゲームがアーカイブを読み込む起動処理の中なので、
+**タイトル画面まで進んでから**オプションを開いてください。
 
 ### 「120」を選んでも 30FPS のままの場合
 
@@ -219,10 +221,6 @@ https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
 
 ゲームのファイルは変更しません。
 
-本体の実行ファイルは Steam の DRM で保護されており、ディスク上ではコード部分が
-暗号化されています。そのためファイルを直接書き換えることができず、起動後に
-復号されたメモリへパッチを当てています。
-
 行っていることは次の 3 つだけです。
 
 1. メニューの最大フレームレート項目が、選択インデックス 0 と 1 しか受け付けない
@@ -230,20 +228,36 @@ https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
 2. 選択肢の定義テーブルを 2 択から 3 択に拡張する
 3. 3 つ目の選択肢に「120」と表示させる
 
-3 番目のラベルだけはメモリの書き換えでは足りません。ゲームがメッセージのかたまりを
-同じ場所へ読み直すため、書き込んでもすぐ元に戻ってしまいます。そこで Mod は、
-**お使いのゲームフォルダにある `archive\archive_06.lnk` を読み取り、未使用のまま
-残っていた文字列枠を「120」に書き換えた複製を `Mods\native120fps\` の中に作り**、
-ゲームがそちらを読むように差し替えています。ゲーム側のファイルは読むだけです。
+### 1 はメモリへの書き込み
+
+本体の実行ファイルは Steam の DRM で保護されており、ディスク上ではコード部分が
+暗号化されています。そのためファイルを直接書き換えることができず、起動後に
+復号されたメモリへパッチを当てています。**書き込むのは 8 バイトだけ**です。
+
+### 2 と 3 はファイルの差し替え
+
+こちらはアーカイブの中のデータなので、メモリの書き換えでは足りません。ゲームが
+そのかたまりを同じ場所へ読み直すため、書き込んでもすぐ元に戻ってしまいます。
+
+そこで Mod は、**お使いのゲームフォルダにあるファイルを読み取り、必要な箇所だけを
+書き換えた複製を `Mods\native120fps\` の中に作り**、ゲームがそちらを読むように
+差し替えています。ゲーム側のファイルは読むだけです。
+
+| ファイル | 書き換える内容 |
+|---|---|
+| `archive\archive_01.lnk` | 選択肢の数を 2 から 3 にし、3 つ目に未使用の文字列 ID を入れる |
+| `archive\archive_06.lnk` | 未使用のまま残っていた文字列枠を「120」にする |
 
 この複製はお使いの環境で生成されるもので、配布物には改変済みのゲームデータは
 一切含まれていません。
 
-書き換える文字列枠は、空であるか既知のプレースホルダであることを確認してから
-書き込みます。その枠が他の用途で使われている言語（イタリア語）では見送るため、
-ゲームのテキストが壊れることはありません。
+書き換える場所は、決まった位置を指定するのではなく**内容から探し、裏取りしてから
+書き込みます。**選択肢の表は、想定どおりの並びになっていることを確認できた箇所が
+ちょうど 1 つでなければ中止します。文字列枠は、空であるか既知のプレースホルダで
+あることを確認してから書き込み、その枠が他の用途で使われている言語（イタリア語）
+では見送ります。**そのため、ゲームのテキストが壊れることはありません。**
 
-パッチの適用が終わると走査は完全に停止し、以降ゲームには一切触れません。
+パッチの適用が終わると Mod は完全に停止し、以降ゲームには一切触れません。
 
 ---
 
@@ -262,7 +276,7 @@ hardcodes the choice to two entries, and this mod removes that restriction.
 - FATAL FRAME II: Crimson Butterfly REMAKE (Steam)
 - A display capable of 120Hz or higher
 - A PC able to sustain 120 FPS
-- About 10 MB of free disk space (a working file is generated on first launch)
+- About 20 MB of free disk space (working files are generated on first launch)
 
 No game files are modified, so this will not trip Steam's file integrity verification.
 
@@ -286,13 +300,14 @@ selected and 120 FPS works correctly.
 You copy two things: **`dinput8.dll` and the `Mods` folder.**
 
 On first launch the mod generates the following inside `Mods\native120fps\`.
-Both are safe to delete; they are rebuilt on the next launch.
+All of them are safe to delete; they are rebuilt on the next launch.
 
 | File | Role |
 |---|---|
 | `native120fps.log` | log |
-| `archive_06.lnk` | working file used to supply the third label (~9 MB) |
-| `archive_06.lnk.tag` | version marker for the above |
+| `archive_01.lnk` | working file that gives the option a third entry (~8 MB) |
+| `archive_06.lnk` | working file that supplies the third label (~9 MB) |
+| `*.lnk.tag` | version markers for the above |
 
 ## Installation
 
@@ -377,7 +392,7 @@ position. Use an overlay (NVIDIA, AMD, Steam) to check the real frame rate.
   120Hz or higher
 - Turn V-Sync off, otherwise the frame rate is capped at your monitor's refresh rate
 - A game update may break this mod. Please wait for an updated release if that happens
-- On first launch, about 9 MB of working data is generated inside
+- On first launch, about 17 MB of working data is generated inside
   `Mods\native120fps\`. The game's own files are only read, never written
 - Antivirus software may flag this mod. It writes to the memory of another process,
   which is a common false-positive trigger. This mod performs no network activity,
@@ -398,14 +413,17 @@ If the option still shows only two entries, check the following:
 If the log contains these lines, the patch was applied correctly:
 
 ```
-[OK] Generated patched archive_06.lnk
 [OK] Menu handler unlocked
-[OK] Choice table extended to 3 entries
-=== Done (attempt 3). The FPS option now has three entries ===
+=== Done (attempt 2). The FPS option now has three entries ===
+[OK] Generated patched archive_01.lnk
+[OK] Generated patched archive_06.lnk
 ```
 
-Note that the mod takes a few seconds after launch to apply. **Reach the title
-screen** before opening the options menu.
+The order of those lines can vary: each archive is generated at the moment the
+game first opens that file.
+
+Note that the third entry is added while the game loads its archives during
+startup, so **reach the title screen** before opening the options menu.
 
 ### If you selected 120 but still get 30 FPS
 
@@ -456,10 +474,6 @@ reproduce the issue, and attach that log — it makes the cause much easier to f
 
 No game files are modified.
 
-The game executable is protected by Steam DRM and its code section is encrypted on
-disk, so it cannot be patched as a file. The patch is applied to the decrypted code
-in memory after the game starts.
-
 Only three changes are made:
 
 1. Remove the hardcoded check in the frame rate menu handler that accepts only
@@ -467,21 +481,36 @@ Only three changes are made:
 2. Extend the choice definition table from two entries to three.
 3. Make the third choice display `120`.
 
-The third label alone cannot be handled in memory: the game reloads the message block
-into the same address, so any write is quickly undone. Instead the mod **reads
-`archive\archive_06.lnk` from your own game folder, writes a copy with the unused
-string slot replaced by `120` into `Mods\native120fps\`**, and makes the game open
-that copy instead. The game's own file is only read.
+### Change 1 is written to memory
 
-That copy is generated on your machine; no modified game data is included in the
+The game executable is protected by Steam DRM and its code section is encrypted on
+disk, so it cannot be patched as a file. The patch is applied to the decrypted code
+in memory after the game starts. **Only 8 bytes are written.**
+
+### Changes 2 and 3 are a file redirect
+
+Those two live inside the game's archives, and writing to memory is not enough: the
+game reloads those blocks into the same address, so any write is quickly undone.
+
+Instead the mod **reads the files from your own game folder, writes copies with just
+the necessary bytes changed into `Mods\native120fps\`**, and makes the game open those
+copies instead. The game's own files are only read.
+
+| File | What is changed |
+|---|---|
+| `archive\archive_01.lnk` | the choice count goes from 2 to 3, and an unused string ID is put in the third entry |
+| `archive\archive_06.lnk` | an unused string slot becomes `120` |
+
+Those copies are generated on your machine; no modified game data is included in the
 download.
 
-A string slot is only written when it is empty or holds the known placeholder.
-Languages where the slot is already used for something else (Italian) are skipped,
-so no game text is ever broken.
+Targets are located **by content rather than by fixed offsets, and verified before
+anything is written.** For the choice table, the mod aborts unless there is exactly
+one place that matches the expected layout. A string slot is only written when it is
+empty or holds the known placeholder, and languages where it is already used for
+something else (Italian) are skipped. **No game text is ever broken.**
 
-Once the patch is applied, scanning stops completely and the mod no longer touches
-the game.
+Once the patch is applied the mod stops completely and no longer touches the game.
 
 ---
 
