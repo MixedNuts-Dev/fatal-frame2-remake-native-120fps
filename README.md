@@ -48,7 +48,7 @@ This differs from editing the `graphics_option.json` settings file by hand:
 **ビルドは不要です。**
 
 1. 先に [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
-   （1.0.0 以降）を、その Releases からダウンロードして導入します
+   （1.0.0 以降）を、その Releases か [Nexus Mods](https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26) からダウンロードして導入します
 2. この Mod の [Releases](../../releases) から配布物をダウンロードし、中身の
    `MixedNuts` フォルダを、ゲームのルート（`FatalFrameII.exe` と同じ場所）に
    そのままコピーします。ローダーの `MixedNuts` フォルダに統合されます
@@ -56,7 +56,7 @@ This differs from editing the `graphics_option.json` settings file by hand:
 **No build required.**
 
 1. First install [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
-   (1.0.0 or later), downloaded from its Releases.
+   (1.0.0 or later), downloaded from its Releases or [Nexus Mods](https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26).
 2. Download this mod from [Releases](../../releases) and copy its `MixedNuts` folder
    into the game's root directory (the folder containing `FatalFrameII.exe`). It
    merges into the loader's `MixedNuts` folder.

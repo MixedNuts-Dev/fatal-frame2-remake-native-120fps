@@ -10,7 +10,8 @@ Created by MixedNuts
 **Version 2.0.0 requires MixedNuts Mod Loader (1.0.0 or later).** 1.x ran on its own;
 2.0.0 is a plugin for the loader.
 
-https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+Nexus Mods: https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26
+GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 
 ---
 
@@ -28,7 +29,8 @@ https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 
 - FATAL FRAME II: Crimson Butterfly REMAKE（Steam 版）
 - **MixedNuts Mod Loader 1.0.0 以降**（別途導入が必要です）
-  https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+  Nexus Mods: https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26
+  GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 - 120Hz 以上に対応したディスプレイ
 - 120FPS を維持できる PC 性能
 - 空きディスク容量 約 20MB（初回起動時に作業用ファイルを生成します）
@@ -339,7 +341,8 @@ hardcodes the choice to two entries, and this mod removes that restriction.
 
 - FATAL FRAME II: Crimson Butterfly REMAKE (Steam)
 - **MixedNuts Mod Loader 1.0.0 or later** (installed separately)
-  https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+  Nexus Mods: https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26
+  GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 - A display capable of 120Hz or higher
 - A PC able to sustain 120 FPS
 - About 20 MB of free disk space (working files are generated on first launch)
