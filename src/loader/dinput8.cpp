@@ -23,110 +23,29 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstdint>
-#include <cstdarg>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include <mixednuts/bytes.hpp>
+#include <mixednuts/file.hpp>
+#include <mixednuts/iat.hpp>
+#include <mixednuts/ini.hpp>
+#include <mixednuts/log.hpp>
+#include <mixednuts/path.hpp>
+#include <mixednuts/proxy.hpp>
+
 namespace {
 
-HMODULE      g_real = nullptr;
-std::wstring g_gameDir;
+using mixednuts::Log;
+using mixednuts::Rd;
+using mixednuts::Utf8;
+using mixednuts::Wr;
+
 std::wstring g_modDir;
 
 bool     g_enabled = true;
-bool     g_log     = true;
 uint32_t g_labelId = 0x00D9E01F;   // 3 つ目の選択肢に使う未使用の文字列ID
-
-// ---- ログ ---------------------------------------------------------------
-
-void Log(const char* fmt, ...)
-{
-    if (!g_log || g_modDir.empty()) return;
-    const std::wstring path = g_modDir + L"native120fps.log";
-    const bool isNew = (GetFileAttributesW(path.c_str()) == INVALID_FILE_ATTRIBUTES);
-    FILE* f = nullptr;
-    if (_wfopen_s(&f, path.c_str(), L"a") != 0 || !f) return;
-    if (isNew) fwrite("\xEF\xBB\xBF", 1, 3, f);
-
-    SYSTEMTIME st{};
-    GetLocalTime(&st);
-    fprintf(f, "[%02d:%02d:%02d] ", st.wHour, st.wMinute, st.wSecond);
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(f, fmt, ap);
-    va_end(ap);
-    fputc('\n', f);
-    fclose(f);
-}
-
-// ---- ファイル入出力 -----------------------------------------------------
-
-bool ReadWholeFile(const std::wstring& path, std::vector<uint8_t>& out)
-{
-    HANDLE h = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
-
-    LARGE_INTEGER sz{};
-    if (!GetFileSizeEx(h, &sz) || sz.QuadPart <= 0 || sz.QuadPart > (64LL << 20))
-    {
-        CloseHandle(h);
-        return false;
-    }
-    out.resize(static_cast<size_t>(sz.QuadPart));
-
-    size_t done = 0;
-    while (done < out.size())
-    {
-        const size_t left = out.size() - done;
-        const DWORD want = static_cast<DWORD>(left > (1u << 20) ? (1u << 20) : left);
-        DWORD got = 0;
-        if (!ReadFile(h, out.data() + done, want, &got, nullptr) || got == 0) break;
-        done += got;
-    }
-    CloseHandle(h);
-    return done == out.size();
-}
-
-bool WriteWholeFile(const std::wstring& path, const std::vector<uint8_t>& data)
-{
-    HANDLE h = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr,
-                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return false;
-
-    size_t done = 0;
-    while (done < data.size())
-    {
-        const size_t left = data.size() - done;
-        const DWORD want = static_cast<DWORD>(left > (1u << 20) ? (1u << 20) : left);
-        DWORD put = 0;
-        if (!WriteFile(h, data.data() + done, want, &put, nullptr) || put == 0) break;
-        done += put;
-    }
-    CloseHandle(h);
-    return done == data.size();
-}
-
-bool FileSizeOf(const std::wstring& path, LONGLONG& size)
-{
-    WIN32_FILE_ATTRIBUTE_DATA fa{};
-    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &fa)) return false;
-    size = (static_cast<LONGLONG>(fa.nFileSizeHigh) << 32) | fa.nFileSizeLow;
-    return true;
-}
-
-uint32_t Read32(const uint8_t* p)
-{
-    uint32_t v = 0;
-    memcpy(&v, p, sizeof(v));
-    return v;
-}
-
-void Write32(uint8_t* p, uint32_t v)
-{
-    memcpy(p, &v, sizeof(v));
-}
 
 // ---- 改変1: archive_01.lnk の選択肢テーブルを 3 択にする ----------------
 //
@@ -151,8 +70,8 @@ bool PatchChoiceTable(std::vector<uint8_t>& buf, char* note, size_t cap)
     int hits = 0;
     for (size_t o = kEcbHeaderBack + 4; o + 12 <= buf.size(); o += 4)
     {
-        if (Read32(&buf[o]) != kId30) continue;
-        if (Read32(&buf[o + 4]) != kId60) continue;
+        if (Rd<uint32_t>(&buf[o]) != kId30) continue;
+        if (Rd<uint32_t>(&buf[o + 4]) != kId60) continue;
 
         const uint8_t* h = &buf[o - kEcbHeaderBack];
         if (!(h[0] == 'e' && h[1] == 'c' && h[2] == 'b' && h[3] == 0)) continue;
@@ -169,21 +88,21 @@ bool PatchChoiceTable(std::vector<uint8_t>& buf, char* note, size_t cap)
     uint8_t* count = &buf[at - 4];
     uint8_t* slot3 = &buf[at + 8];
 
-    if (Read32(count) == 3 && Read32(slot3) == g_labelId)
+    if (Rd<uint32_t>(count) == 3 && Rd<uint32_t>(slot3) == g_labelId)
     {
         sprintf_s(note, cap, "already 3 entries");
         return true;
     }
     // 想定外の値を上書きしない。空であることを確認してから書く。
-    if (Read32(count) != 2 || Read32(slot3) != 0)
+    if (Rd<uint32_t>(count) != 2 || Rd<uint32_t>(slot3) != 0)
     {
         sprintf_s(note, cap, "unexpected values (count=%u, slot3=0x%08X)",
-                  Read32(count), Read32(slot3));
+                  Rd<uint32_t>(count), Rd<uint32_t>(slot3));
         return false;
     }
 
-    Write32(count, 3);
-    Write32(slot3, g_labelId);
+    Wr<uint32_t>(count, 3);
+    Wr<uint32_t>(slot3, g_labelId);
     sprintf_s(note, cap, "row at 0x%llX, label ID 0x%08X",
               static_cast<unsigned long long>(at - 4), g_labelId);
     return true;
@@ -302,46 +221,38 @@ void WriteTag(const ArchiveJob& job, const std::wstring& tagPath, LONGLONG srcSi
 bool EnsurePatchedArchive(const ArchiveJob& job, const std::wstring& src,
                           const std::wstring& dst)
 {
+    namespace file = mixednuts::file;
     LONGLONG srcSize = 0, dstSize = 0;
-    if (!FileSizeOf(src, srcSize)) return false;
+    if (!file::Size(src, srcSize)) return false;
 
     const std::wstring tag = dst + L".tag";
-    if (FileSizeOf(dst, dstSize) && dstSize == srcSize && TagMatches(job, tag, srcSize))
+    if (file::Size(dst, dstSize) && dstSize == srcSize && TagMatches(job, tag, srcSize))
         return true;
 
     std::vector<uint8_t> buf;
-    if (!ReadWholeFile(src, buf))
+    if (!file::ReadAll(src, buf, 64ull << 20))
     {
-        Log("[NG] Cannot read %ls", job.name);
+        Log("[NG] Cannot read %s", Utf8(job.name).c_str());
         return false;
     }
 
     char note[128]{};
     if (!job.patch(buf, note, sizeof(note)))
     {
-        Log("[NG] Could not patch %ls: %s. A game update may have changed the"
-            " layout. Please report this log.", job.name, note);
+        Log("[NG] Could not patch %s: %s. A game update may have changed the"
+            " layout. Please report this log.", Utf8(job.name).c_str(), note);
         return false;
     }
 
     CreateDirectoryW(g_modDir.c_str(), nullptr);
-    const std::wstring tmp = dst + L".tmp";
-    if (!WriteWholeFile(tmp, buf))
+    if (!file::WriteAll(dst, buf))
     {
-        Log("[NG] Failed to write the patched %ls", job.name);
-        DeleteFileW(tmp.c_str());
-        return false;
-    }
-    DeleteFileW(dst.c_str());
-    if (!MoveFileW(tmp.c_str(), dst.c_str()))
-    {
-        Log("[NG] Failed to install the patched %ls", job.name);
-        DeleteFileW(tmp.c_str());
+        Log("[NG] Failed to write the patched %s", Utf8(job.name).c_str());
         return false;
     }
     WriteTag(job, tag, srcSize);
-    Log("[OK] Generated patched %ls (%s / %lld bytes)",
-        job.name, note, static_cast<long long>(buf.size()));
+    Log("[OK] Generated patched %s (%s / %lld bytes)",
+        Utf8(job.name).c_str(), note, static_cast<long long>(buf.size()));
     return true;
 }
 
@@ -354,14 +265,6 @@ PFN_CreateFileW  g_origCreateFileW = nullptr;
 PVOID*           g_iatSlot = nullptr;
 CRITICAL_SECTION g_lock{};
 
-bool EndsWithNoCase(const wchar_t* s, const wchar_t* suffix)
-{
-    if (!s) return false;
-    const size_t ls = wcslen(s), lt = wcslen(suffix);
-    if (ls < lt) return false;
-    return _wcsicmp(s + (ls - lt), suffix) == 0;
-}
-
 HANDLE WINAPI MyCreateFileW(LPCWSTR name, DWORD access, DWORD share,
                             LPSECURITY_ATTRIBUTES sa, DWORD disp, DWORD flags,
                             HANDLE tmpl)
@@ -370,7 +273,7 @@ HANDLE WINAPI MyCreateFileW(LPCWSTR name, DWORD access, DWORD share,
     {
         for (auto& job : g_jobs)
         {
-            if (!EndsWithNoCase(name, job.suffix)) continue;
+            if (!mixednuts::EndsWithPath(name, job.suffix)) continue;
 
             const std::wstring dst = g_modDir + job.name;
             EnterCriticalSection(&g_lock);
@@ -384,8 +287,8 @@ HANDLE WINAPI MyCreateFileW(LPCWSTR name, DWORD access, DWORD share,
                 HANDLE h = g_origCreateFileW(dst.c_str(), access, share, sa,
                                              disp, flags, tmpl);
                 if (h != INVALID_HANDLE_VALUE) return h;
-                Log("[NG] Cannot open the patched %ls; falling back to the"
-                    " game's own file", job.name);
+                Log("[NG] Cannot open the patched %s; falling back to the"
+                    " game's own file", Utf8(job.name).c_str());
             }
             break;
         }
@@ -393,48 +296,12 @@ HANDLE WINAPI MyCreateFileW(LPCWSTR name, DWORD access, DWORD share,
     return g_origCreateFileW(name, access, share, sa, disp, flags, tmpl);
 }
 
-PVOID* FindIatSlot(HMODULE mod, const char* dll, const char* func)
-{
-    auto base = reinterpret_cast<BYTE*>(mod);
-    auto dos = reinterpret_cast<IMAGE_DOS_HEADER*>(base);
-    if (!dos || dos->e_magic != IMAGE_DOS_SIGNATURE) return nullptr;
-    auto nt = reinterpret_cast<IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE) return nullptr;
-
-    const auto& dir = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
-    if (!dir.VirtualAddress) return nullptr;
-
-    auto imp = reinterpret_cast<IMAGE_IMPORT_DESCRIPTOR*>(base + dir.VirtualAddress);
-    for (; imp->Name; ++imp)
-    {
-        if (_stricmp(reinterpret_cast<const char*>(base + imp->Name), dll) != 0) continue;
-
-        auto thunk = reinterpret_cast<IMAGE_THUNK_DATA64*>(base + imp->FirstThunk);
-        auto orig = reinterpret_cast<IMAGE_THUNK_DATA64*>(
-            base + (imp->OriginalFirstThunk ? imp->OriginalFirstThunk : imp->FirstThunk));
-        for (; orig->u1.AddressOfData; ++orig, ++thunk)
-        {
-            if (orig->u1.Ordinal & IMAGE_ORDINAL_FLAG64) continue;
-            auto ibn = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(base + orig->u1.AddressOfData);
-            if (strcmp(reinterpret_cast<const char*>(ibn->Name), func) == 0)
-                return reinterpret_cast<PVOID*>(&thunk->u1.Function);
-        }
-    }
-    return nullptr;
-}
-
 bool ApplyHook()
 {
     if (!g_iatSlot) return false;
     if (*g_iatSlot == reinterpret_cast<PVOID>(&MyCreateFileW)) return true;
-
-    DWORD old = 0;
-    if (!VirtualProtect(g_iatSlot, sizeof(PVOID), PAGE_READWRITE, &old)) return false;
-    g_origCreateFileW = reinterpret_cast<PFN_CreateFileW>(*g_iatSlot);
-    *g_iatSlot = reinterpret_cast<PVOID>(&MyCreateFileW);
-    DWORD tmp = 0;
-    VirtualProtect(g_iatSlot, sizeof(PVOID), old, &tmp);
-    return true;
+    return mixednuts::iat::Swap(g_iatSlot, reinterpret_cast<PVOID>(&MyCreateFileW),
+                                g_origCreateFileW);
 }
 
 // Steam の DRM は起動時に輸入テーブルを組み直すことがあるため、
@@ -460,72 +327,31 @@ DWORD WINAPI LoadMods(LPVOID)
     return 0;
 }
 
-void LoadRealDinput8()
-{
-    if (g_real) return;
-    wchar_t path[MAX_PATH]{};
-    GetSystemDirectoryW(path, MAX_PATH);
-    wcscat_s(path, L"\\dinput8.dll");
-    g_real = LoadLibraryW(path);
-}
-
-FARPROC RealProc(const char* name)
-{
-    LoadRealDinput8();
-    return g_real ? GetProcAddress(g_real, name) : nullptr;
-}
-
 // 差し替えはゲームがアーカイブを開く前に決まっていなければならないので、
 // 設定はここで読む。Enabled=0 のときは一切差し替えない。
 void LoadConfig()
 {
-    const std::wstring ini = g_modDir + L"native120fps.ini";
-    g_enabled = GetPrivateProfileIntW(L"General", L"Enabled", 1, ini.c_str()) != 0;
-    g_log     = GetPrivateProfileIntW(L"General", L"Log", 1, ini.c_str()) != 0;
-    g_labelId = static_cast<uint32_t>(
-        GetPrivateProfileIntW(L"Patch", L"LabelId", 0x00D9E01F, ini.c_str()));
+    namespace ini = mixednuts::ini;
+    const std::wstring file = g_modDir + L"native120fps.ini";
+    g_enabled = ini::Bool(file, L"General", L"Enabled", true);
+    mixednuts::log::Open(g_modDir, L"native120fps.log",
+                         ini::Bool(file, L"General", L"Log", true));
+    g_labelId = static_cast<uint32_t>(ini::Int(file, L"Patch", L"LabelId", 0x00D9E01F));
     if (g_labelId == 0) g_labelId = 0x00D9E01F;
 }
 
 } // namespace
 
 // ---- 転送用エクスポート -------------------------------------------------
+//
+// dinput8.dll の関数はどれも整数・ポインタの引数を 8 個以下しか取らず、
+// 浮動小数点の引数も無いので、8 個そのまま受け渡す転送で済ませる（proxy.hpp）。
 
-extern "C" HRESULT WINAPI DirectInput8Create(HINSTANCE hinst, DWORD ver, REFIID riid,
-                                             LPVOID* out, LPUNKNOWN outer)
-{
-    using Fn = HRESULT(WINAPI*)(HINSTANCE, DWORD, REFIID, LPVOID*, LPUNKNOWN);
-    static Fn fn = reinterpret_cast<Fn>(RealProc("DirectInput8Create"));
-    return fn ? fn(hinst, ver, riid, out, outer) : E_FAIL;
-}
-
-extern "C" HRESULT WINAPI DllCanUnloadNow()
-{
-    using Fn = HRESULT(WINAPI*)();
-    static Fn fn = reinterpret_cast<Fn>(RealProc("DllCanUnloadNow"));
-    return fn ? fn() : S_FALSE;
-}
-
-extern "C" HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppv)
-{
-    using Fn = HRESULT(WINAPI*)(REFCLSID, REFIID, LPVOID*);
-    static Fn fn = reinterpret_cast<Fn>(RealProc("DllGetClassObject"));
-    return fn ? fn(rclsid, riid, ppv) : E_FAIL;
-}
-
-extern "C" HRESULT WINAPI DllRegisterServer()
-{
-    using Fn = HRESULT(WINAPI*)();
-    static Fn fn = reinterpret_cast<Fn>(RealProc("DllRegisterServer"));
-    return fn ? fn() : E_FAIL;
-}
-
-extern "C" HRESULT WINAPI DllUnregisterServer()
-{
-    using Fn = HRESULT(WINAPI*)();
-    static Fn fn = reinterpret_cast<Fn>(RealProc("DllUnregisterServer"));
-    return fn ? fn() : E_FAIL;
-}
+MIXEDNUTS_FORWARD(Proxy_DirectInput8Create, "DirectInput8Create", E_FAIL)
+MIXEDNUTS_FORWARD(Proxy_DllCanUnloadNow, "DllCanUnloadNow", S_FALSE)
+MIXEDNUTS_FORWARD(Proxy_DllGetClassObject, "DllGetClassObject", E_FAIL)
+MIXEDNUTS_FORWARD(Proxy_DllRegisterServer, "DllRegisterServer", E_FAIL)
+MIXEDNUTS_FORWARD(Proxy_DllUnregisterServer, "DllUnregisterServer", E_FAIL)
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
 {
@@ -534,18 +360,15 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
         DisableThreadLibraryCalls(hModule);
         InitializeCriticalSection(&g_lock);
 
-        wchar_t exe[MAX_PATH]{};
-        GetModuleFileNameW(nullptr, exe, MAX_PATH);
-        g_gameDir.assign(exe);
-        g_gameDir.resize(g_gameDir.find_last_of(L'\\') + 1);
-        g_modDir = g_gameDir + L"Mods\\native120fps\\";
+        g_modDir = mixednuts::GameDir() + L"Mods\\native120fps\\";
 
         LoadConfig();
-        LoadRealDinput8();
+        mixednuts::proxy::Init(L"dinput8.dll");
 
         // 差し替えはゲームがアーカイブを開く前に仕掛ける必要があるので、
         // ここで同期的に掛ける。実際の生成は最初に開かれたときに行う。
-        g_iatSlot = FindIatSlot(GetModuleHandleW(nullptr), "KERNEL32.dll", "CreateFileW");
+        g_iatSlot = mixednuts::iat::FindImport(GetModuleHandleW(nullptr), "KERNEL32.dll",
+                                               "CreateFileW");
         ApplyHook();
 
         if (HANDLE t = CreateThread(nullptr, 0, HookGuard, nullptr, 0, nullptr))

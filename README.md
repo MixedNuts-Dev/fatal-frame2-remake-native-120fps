@@ -101,9 +101,17 @@ code does not expect a third entry when it restores the cursor position.
 Visual Studio 2022 の C++ ツールセットが必要です。
 Requires the Visual Studio 2022 C++ toolset.
 
+共通コード（[mod-loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)）を
+submodule で取り込んでいるので、`--recursive` 付きで clone してください。
+The shared code ([mod-loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader))
+is a git submodule, so clone with `--recursive`.
+
 ```
+git clone --recursive https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps.git
 build.bat
 ```
+
+clone 済みなら / If already cloned: `git submodule update --init`
 
 `dist\` に配布用の一式が出力されます。 / The distributable set is written to `dist\`.
 

@@ -21,54 +21,29 @@
 // 起きた）。コメントは日本語のままにする。
 
 #include <windows.h>
-#include <cstdio>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
+#include <mixednuts/code.hpp>
+#include <mixednuts/env.hpp>
+#include <mixednuts/file.hpp>
+#include <mixednuts/ini.hpp>
+#include <mixednuts/log.hpp>
+#include <mixednuts/path.hpp>
+
 namespace {
+
+using mixednuts::Log;
+using mixednuts::Utf8;
+using mixednuts::code::Hex;
+using mixednuts::code::Rva;
 
 constexpr char kVersion[] = "1.1.0";
 
-std::wstring g_modDir;
-bool         g_enabled  = true;
-bool         g_log      = true;
-bool         g_diagnose = false;   // ini: Diagnose=1 のときだけ追加の診断を出す
-
-// ログは UTF-8 で書くので、ワイド文字列は明示的に変換する
-// （%ls に任せるとロケール依存でパスが化ける）
-std::string Utf8(const wchar_t* w)
-{
-    if (!w || !*w) return std::string();
-    const int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, nullptr, 0, nullptr, nullptr);
-    if (n <= 1) return std::string();
-    std::string s(static_cast<size_t>(n - 1), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, w, -1, &s[0], n, nullptr, nullptr);
-    return s;
-}
-
-void Log(const char* fmt, ...)
-{
-    if (!g_log) return;
-    wchar_t path[MAX_PATH]{};
-    swprintf_s(path, L"%snative120fps.log", g_modDir.c_str());
-
-    const bool isNew = (GetFileAttributesW(path) == INVALID_FILE_ATTRIBUTES);
-    FILE* f = nullptr;
-    if (_wfopen_s(&f, path, L"a") != 0 || !f) return;
-    if (isNew) fwrite("\xEF\xBB\xBF", 1, 3, f);   // UTF-8 BOM（メモ帳で文字化けしないように）
-
-    SYSTEMTIME st{};
-    GetLocalTime(&st);
-    fprintf(f, "[%02d:%02d:%02d] ", st.wHour, st.wMinute, st.wSecond);
-
-    va_list ap;
-    va_start(ap, fmt);
-    vfprintf(f, fmt, ap);
-    va_end(ap);
-    fputc('\n', f);
-    fclose(f);
-}
+bool g_enabled  = true;
+bool g_diagnose = false;   // ini: Diagnose=1 のときだけ追加の診断を出す
 
 // ---- シグネチャ ---------------------------------------------------------
 //
@@ -117,114 +92,14 @@ const uint8_t kPatch[8] = { 0x0F, 0xB6, 0xD8, 0x90, 0x90, 0x90, 0x90, 0x90 };
 
 // ---- ユーティリティ -----------------------------------------------------
 
-inline uint32_t Read32(const uint8_t* p)
-{
-    uint32_t v = 0;
-    memcpy(&v, p, sizeof(v));   // 未アライメントでも安全。MSVC は 1 命令に落とす
-    return v;
-}
-
 inline bool IsAnchor(const uint8_t* p)
 {
-    return p[0] == kAnchorOp && Read32(p + 1) == kAnchorImm;
-}
-
-bool WriteMem(void* addr, const void* data, size_t len)
-{
-    DWORD old = 0;
-    if (!VirtualProtect(addr, len, PAGE_EXECUTE_READWRITE, &old)) return false;
-    memcpy(addr, data, len);
-    DWORD tmp = 0;
-    VirtualProtect(addr, len, old, &tmp);
-    FlushInstructionCache(GetCurrentProcess(), addr, len);
-    return true;
+    return p[0] == kAnchorOp && mixednuts::Rd<uint32_t>(p + 1) == kAnchorImm;
 }
 
 bool MatchSig(const uint8_t* p)
 {
-    for (size_t i = 0; i < kSigLen; ++i)
-        if (kMask[i] && p[i] != kSig[i]) return false;
-    return true;
-}
-
-// 実行ファイルの .text 範囲を得る
-bool GetTextSection(uint8_t*& base, size_t& size)
-{
-    auto mod = reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr));
-    if (!mod) return false;
-    auto dos = reinterpret_cast<IMAGE_DOS_HEADER*>(mod);
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE) return false;
-    auto nt = reinterpret_cast<IMAGE_NT_HEADERS64*>(mod + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE) return false;
-
-    auto sec = IMAGE_FIRST_SECTION(nt);
-    for (WORD i = 0; i < nt->FileHeader.NumberOfSections; ++i, ++sec)
-    {
-        if (memcmp(sec->Name, ".text", 5) == 0)
-        {
-            base = mod + sec->VirtualAddress;
-            size = sec->Misc.VirtualSize;
-            return true;
-        }
-    }
-    return false;
-}
-
-// モジュール先頭からの相対位置。ログに出すためだけに使う
-unsigned long long Rva(const void* p)
-{
-    return static_cast<unsigned long long>(
-        static_cast<const uint8_t*>(p) - reinterpret_cast<uint8_t*>(GetModuleHandleW(nullptr)));
-}
-
-// バイト列を "AA BB CC " 形式にする
-std::string Hex(const uint8_t* p, size_t n)
-{
-    std::string s;
-    s.reserve(n * 3);
-    char buf[4]{};
-    for (size_t i = 0; i < n; ++i)
-    {
-        sprintf_s(buf, "%02X ", p[i]);
-        s += buf;
-    }
-    return s;
-}
-
-// 小さなテキストファイルを丸ごと読む（設定ファイルの照会用）
-std::string ReadTextFile(const wchar_t* path, size_t maxBytes)
-{
-    HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (h == INVALID_HANDLE_VALUE) return std::string();
-    LARGE_INTEGER sz{};
-    if (!GetFileSizeEx(h, &sz) || sz.QuadPart <= 0)
-    {
-        CloseHandle(h);
-        return std::string();
-    }
-    const size_t n = (static_cast<unsigned long long>(sz.QuadPart) < maxBytes)
-                     ? static_cast<size_t>(sz.QuadPart) : maxBytes;
-    std::string s(n, '\0');
-    DWORD got = 0;
-    const BOOL ok = ReadFile(h, &s[0], static_cast<DWORD>(n), &got, nullptr);
-    CloseHandle(h);
-    if (!ok) return std::string();
-    s.resize(got);
-    return s;
-}
-
-// Steam の acf は `"key"  "value"` 形式
-std::string AcfValue(const std::string& s, const char* key)
-{
-    const std::string k = std::string("\"") + key + "\"";
-    size_t at = s.find(k);
-    if (at == std::string::npos) return std::string();
-    at = s.find('"', at + k.size());
-    if (at == std::string::npos) return std::string();
-    const size_t end = s.find('"', at + 1);
-    if (end == std::string::npos) return std::string();
-    return s.substr(at + 1, end - at - 1);
+    return mixednuts::code::Match(p, {kSig, kMask, kSigLen});
 }
 
 // json の `"key":"value"` または `"key":value` を素朴に取り出す。
@@ -251,65 +126,7 @@ std::string JsonValue(const std::string& s, const char* key)
 
 // ---- 環境情報 -----------------------------------------------------------
 //
-// 不具合報告のログだけで、報告者の環境がこちらの検証環境と同じかどうかを
-// 判断できるようにする。ゲームのバージョン・Steam のビルド番号・言語・
-// 実際のリフレッシュレート・保存された FPS 設定まで出す。
-
-// exe のバージョンリソースから FileVersion / ProductVersion を読む
-void LogExeVersion(const wchar_t* exe)
-{
-    DWORD dummy = 0;
-    const DWORD n = GetFileVersionInfoSizeW(exe, &dummy);
-    if (n == 0)
-    {
-        Log("Game version: (no version resource)");
-        return;
-    }
-    std::vector<uint8_t> buf(n);
-    if (!GetFileVersionInfoW(exe, 0, n, buf.data()))
-    {
-        Log("Game version: (unreadable)");
-        return;
-    }
-    VS_FIXEDFILEINFO* ffi = nullptr;
-    UINT len = 0;
-    if (!VerQueryValueW(buf.data(), L"\\", reinterpret_cast<LPVOID*>(&ffi), &len) || !ffi)
-    {
-        Log("Game version: (unreadable)");
-        return;
-    }
-    Log("Game version: file %u.%u.%u.%u / product %u.%u.%u.%u",
-        HIWORD(ffi->dwFileVersionMS), LOWORD(ffi->dwFileVersionMS),
-        HIWORD(ffi->dwFileVersionLS), LOWORD(ffi->dwFileVersionLS),
-        HIWORD(ffi->dwProductVersionMS), LOWORD(ffi->dwProductVersionMS),
-        HIWORD(ffi->dwProductVersionLS), LOWORD(ffi->dwProductVersionLS));
-}
-
-// Steam のインストール情報。exe から 2 階層上（steamapps）にある
-//   steamapps\common\FatalFrameII\FatalFrameII.exe
-//   steamapps\appmanifest_3920610.acf
-// buildid はゲームのビルドを一意に示すので、バージョン違いの判定に一番効く。
-void LogSteamManifest(const wchar_t* exe)
-{
-    std::wstring dir(exe);
-    for (int up = 0; up < 3; ++up)   // exe 名 / FatalFrameII / common
-    {
-        const size_t slash = dir.find_last_of(L'\\');
-        if (slash == std::wstring::npos) return;
-        dir.resize(slash);
-    }
-    const std::wstring acf = dir + L"\\appmanifest_3920610.acf";
-    const std::string s = ReadTextFile(acf.c_str(), 64 * 1024);
-    if (s.empty())
-    {
-        Log("Steam manifest: not found (%s)", Utf8(acf.c_str()).c_str());
-        return;
-    }
-    const std::string build = AcfValue(s, "buildid");
-    const std::string lang  = AcfValue(s, "language");
-    Log("Steam build: %s / install language: %s",
-        build.empty() ? "?" : build.c_str(), lang.empty() ? "?" : lang.c_str());
-}
+// 共通の環境情報（env.hpp）に加えて、保存された FPS 設定まで出す。
 
 // ゲームが保存しているグラフィック設定。
 // fps がここで何になっているかは、この Mod の不具合報告で最も知りたい値。
@@ -333,7 +150,7 @@ void LogGraphicsOption()
     }
     const bool readOnly = (attr & FILE_ATTRIBUTE_READONLY) != 0;
 
-    const std::string s = ReadTextFile(p.c_str(), 256 * 1024);
+    const std::string s = mixednuts::file::ReadText(p, 256 * 1024);
     if (s.empty())
     {
         Log("graphics_option.json: unreadable (read-only: %s)", readOnly ? "YES" : "no");
@@ -351,88 +168,11 @@ void LogGraphicsOption()
             " choice. Clear the read-only attribute on that file.");
 }
 
-// 実際のリフレッシュレート。120Hz 以上になっていなければ 120FPS は出ない。
-void LogDisplay()
-{
-    DEVMODEW dm{};
-    dm.dmSize = sizeof(dm);
-    if (EnumDisplaySettingsW(nullptr, ENUM_CURRENT_SETTINGS, &dm))
-        Log("Display: %ux%u @ %u Hz (%u bpp)",
-            dm.dmPelsWidth, dm.dmPelsHeight, dm.dmDisplayFrequency, dm.dmBitsPerPel);
-    else
-        Log("Display: unknown");
-
-    DISPLAY_DEVICEW dd{};
-    dd.cb = sizeof(dd);
-    if (EnumDisplayDevicesW(nullptr, 0, &dd, 0))
-        Log("Adapter: %s", Utf8(dd.DeviceString).c_str());
-}
-
-// RTL_OSVERSIONINFOW と同じ並び。winternl.h を持ち込まずに使う
-struct OsVerInfo {
-    ULONG dwOSVersionInfoSize;
-    ULONG dwMajorVersion;
-    ULONG dwMinorVersion;
-    ULONG dwBuildNumber;
-    ULONG dwPlatformId;
-    WCHAR szCSDVersion[128];
-};
-
-void LogSystem()
-{
-    // GetVersionEx は互換シムで嘘をつくので ntdll を直接呼ぶ
-    OsVerInfo vi{};
-    vi.dwOSVersionInfoSize = sizeof(vi);
-    using Fn = LONG(WINAPI*)(OsVerInfo*);
-    if (HMODULE nt = GetModuleHandleW(L"ntdll.dll"))
-    {
-        if (auto fn = reinterpret_cast<Fn>(
-                reinterpret_cast<void*>(GetProcAddress(nt, "RtlGetVersion"))))
-        {
-            if (fn(&vi) == 0)
-                Log("OS: Windows %u.%u build %u",
-                    vi.dwMajorVersion, vi.dwMinorVersion, vi.dwBuildNumber);
-        }
-    }
-
-    wchar_t loc[LOCALE_NAME_MAX_LENGTH]{};
-    if (GetUserDefaultLocaleName(loc, LOCALE_NAME_MAX_LENGTH) > 0)
-        Log("Locale: %s / UI language: 0x%04X",
-            Utf8(loc).c_str(), GetUserDefaultUILanguage());
-}
-
+// 実際のリフレッシュレート（env.hpp の Display 行）が 120Hz 以上になっていなければ
+// 120FPS は出ない。
 void LogEnvironment()
 {
-    wchar_t exe[MAX_PATH]{};
-    GetModuleFileNameW(nullptr, exe, MAX_PATH);
-    Log("exe: %s", Utf8(exe).c_str());
-
-    WIN32_FILE_ATTRIBUTE_DATA fad{};
-    if (GetFileAttributesExW(exe, GetFileExInfoStandard, &fad))
-    {
-        const unsigned long long bytes =
-            (static_cast<unsigned long long>(fad.nFileSizeHigh) << 32) | fad.nFileSizeLow;
-        FILETIME   lt{};
-        SYSTEMTIME st{};
-        FileTimeToLocalFileTime(&fad.ftLastWriteTime, &lt);
-        FileTimeToSystemTime(&lt, &st);
-        Log("exe size: %llu bytes / modified: %04d-%02d-%02d %02d:%02d",
-            bytes, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute);
-    }
-
-    LogExeVersion(exe);
-    LogSteamManifest(exe);
-
-    uint8_t* base = nullptr;
-    size_t   size = 0;
-    if (GetTextSection(base, size))
-        Log("module: 0x%p / .text: 0x%p (%llu bytes)",
-            GetModuleHandleW(nullptr), base, static_cast<unsigned long long>(size));
-    else
-        Log(".text: could not be located");
-
-    LogDisplay();
-    LogSystem();
+    mixednuts::env::LogAll();
     LogGraphicsOption();
 }
 
@@ -491,7 +231,7 @@ HandlerResult CollectSites(std::vector<Site>& out, int& anchorCount)
 
     uint8_t* base = nullptr;
     size_t   size = 0;
-    if (!GetTextSection(base, size)) return HandlerResult::NoTextSection;
+    if (!mixednuts::code::TextSection(base, size)) return HandlerResult::NoTextSection;
 
     for (size_t i = 0; i + sizeof(kAnchor) <= size; ++i)
     {
@@ -538,7 +278,7 @@ void DumpAnchors()
 {
     uint8_t* base = nullptr;
     size_t   size = 0;
-    if (!GetTextSection(base, size))
+    if (!mixednuts::code::TextSection(base, size))
     {
         Log("[??] .text is unavailable, cannot diagnose");
         return;
@@ -588,7 +328,7 @@ HandlerResult PatchMenuHandler()
     const Site& s = sites[0];
     if (s.patched) return HandlerResult::AlreadyPatched;
 
-    if (!WriteMem(s.target, kPatch, sizeof(kPatch))) return HandlerResult::WriteFailed;
+    if (!mixednuts::code::Write(s.target, kPatch, sizeof(kPatch))) return HandlerResult::WriteFailed;
 
     if (s.exact)
     {
@@ -660,18 +400,13 @@ void WatchFpsIndex()
 
 void LoadConfig(HMODULE self)
 {
-    wchar_t path[MAX_PATH]{};
-    GetModuleFileNameW(self, path, MAX_PATH);
-    std::wstring dir(path);
-    dir.resize(dir.find_last_of(L'\\') + 1);
-    g_modDir = dir;
-
-    const std::wstring ini = dir + L"native120fps.ini";
-    g_log      = GetPrivateProfileIntW(L"General", L"Log", 1, ini.c_str()) != 0;
-    g_diagnose = GetPrivateProfileIntW(L"General", L"Diagnose", 0, ini.c_str()) != 0;
-    g_enabled  = GetPrivateProfileIntW(L"General", L"Enabled", 1, ini.c_str()) != 0;
-    g_fpsIndexRva = static_cast<uintptr_t>(
-        GetPrivateProfileIntW(L"Patch", L"FpsIndexRva", 0x2C31808, ini.c_str()));
+    namespace ini = mixednuts::ini;
+    const std::wstring dir = mixednuts::ModuleDir(self);
+    const std::wstring file = dir + L"native120fps.ini";
+    mixednuts::log::Open(dir, L"native120fps.log", ini::Bool(file, L"General", L"Log", true));
+    g_diagnose = ini::Bool(file, L"General", L"Diagnose", false);
+    g_enabled  = ini::Bool(file, L"General", L"Enabled", true);
+    g_fpsIndexRva = static_cast<uint32_t>(ini::Int(file, L"Patch", L"FpsIndexRva", 0x2C31808));
 }
 
 DWORD WINAPI Worker(LPVOID param)
