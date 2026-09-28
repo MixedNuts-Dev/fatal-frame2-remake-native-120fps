@@ -1,4 +1,4 @@
-﻿# Native 120FPS Option
+﻿# Native120FPSOption
 
 **FATAL FRAME II: Crimson Butterfly REMAKE**（零 〜紅い蝶〜 REMAKE / Steam AppID 3920610）用の Mod です。
 A mod for FATAL FRAME / PROJECT ZERO II: Crimson Butterfly REMAKE (Steam, AppID 3920610).
@@ -15,11 +15,11 @@ By default only 30 and 60 are selectable.
 **The game already supports 120 FPS internally.** The menu handler simply hardcodes
 the choice list to two entries, and this mod removes that restriction.
 
-> **2.0.0 からは [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)（1.0.0 以降）が必要です。**
+> **2.0.0 からは [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)（1.0.0 以降）が必要です。**
 > 1.x は単体で動作していましたが、2.0.0 はローダーのプラグインになり、`dinput8.dll` を
 > 同梱しなくなりました。ローダーは別途導入してください。
 >
-> **Version 2.0.0 requires [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader) (1.0.0 or later).**
+> **Version 2.0.0 requires [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader) (1.0.0 or later).**
 > 1.x ran on its own; 2.0.0 is a plugin for the loader and no longer ships `dinput8.dll`.
 > Install the loader separately.
 
@@ -47,7 +47,7 @@ This differs from editing the `graphics_option.json` settings file by hand:
 
 **ビルドは不要です。**
 
-1. 先に [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
+1. 先に [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
    （1.0.0 以降）を、その Releases か [Nexus Mods](https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26) からダウンロードして導入します
 2. この Mod の [Releases](../../releases) から配布物をダウンロードし、中身の
    `MixedNuts` フォルダを、ゲームのルート（`FatalFrameII.exe` と同じ場所）に
@@ -55,7 +55,7 @@ This differs from editing the `graphics_option.json` settings file by hand:
 
 **No build required.**
 
-1. First install [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
+1. First install [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
    (1.0.0 or later), downloaded from its Releases or [Nexus Mods](https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26).
 2. Download this mod from [Releases](../../releases) and copy its `MixedNuts` folder
    into the game's root directory (the folder containing `FatalFrameII.exe`). It
@@ -64,8 +64,8 @@ This differs from editing the `graphics_option.json` settings file by hand:
 ```
 FatalFrameII/
   FatalFrameII.exe
-  dinput8.dll                                  <- MixedNuts Mod Loader
-  MixedNuts/MixedNutsLoader.dll                <- MixedNuts Mod Loader
+  dinput8.dll                                  <- MixedNutsModLoader
+  MixedNuts/MixedNutsLoader.dll                <- MixedNutsModLoader
   MixedNuts/Mods/native120fps/native120fps.dll <- この Mod / this mod
   MixedNuts/Mods/native120fps/native120fps.ini
   MixedNuts/Mods/native120fps/README.md
@@ -105,7 +105,7 @@ folder). To disable temporarily, set `Enabled=0` in `native120fps.ini`.
 1. 導入前に、ゲームのルートから古い `Mods\native120fps\` フォルダを削除します
 2. ローダーを導入するときに、古い `dinput8.dll` をローダーの `dinput8.dll` で
    上書きします
-3. 他の MixedNuts の Mod（Mouse Wheel Camera Speed = `version.dll` + `Mods\wheelspeed\`、
+3. 他の MixedNuts の Mod（MouseWheelCameraSpeed = `version.dll` + `Mods\wheelspeed\`、
    TwinSwap = `xinput1_4.dll` + `Mods\twinswap\`）も 1.x を使っている場合は、
    まとめて更新してください。詳しくはローダーの README を参照してください
 
@@ -115,7 +115,7 @@ folder). To disable temporarily, set `Enabled=0` in `native120fps.ini`.
 1. Before installing, delete the old `Mods\native120fps\` folder from the game root.
 2. When you install the loader, overwrite the old `dinput8.dll` with the loader's
    `dinput8.dll`.
-3. If you also use the other MixedNuts mods at 1.x (Mouse Wheel Camera Speed =
+3. If you also use the other MixedNuts mods at 1.x (MouseWheelCameraSpeed =
    `version.dll` + `Mods\wheelspeed\`, TwinSwap = `xinput1_4.dll` + `Mods\twinswap\`),
    update them all at once. See the loader's README for details.
 
@@ -125,14 +125,14 @@ corresponding new mod and writes a message starting with `[!!]` to
 
 ### 他の Mod との併用 / Using with other mods
 
-Native 120FPS Option、Mouse Wheel Camera Speed、TwinSwap の 2.0.0 はすべて同じ
+Native120FPSOption、MouseWheelCameraSpeed、TwinSwap の 2.0.0 はすべて同じ
 ローダーの上で動くため、DLL を 1 つ共有し、互いに競合しません。
 
 別の Mod がすでに `dinput8.dll` を使っている場合は、上書きしないでください。
 ローダーの `dinput8.dll` は `version.dll` または `xinput1_4.dll` に名前を変えて
 使えます（ローダーの README を参照してください）。
 
-Native 120FPS Option, Mouse Wheel Camera Speed and TwinSwap 2.0.0 all run on the same
+Native120FPSOption, MouseWheelCameraSpeed and TwinSwap 2.0.0 all run on the same
 loader, so they share one DLL and never conflict.
 
 If another mod already uses `dinput8.dll`, do not overwrite it. The loader's
