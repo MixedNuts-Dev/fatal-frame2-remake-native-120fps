@@ -5,6 +5,13 @@ A mod for FATAL FRAME / PROJECT ZERO II: Crimson Butterfly REMAKE.
 
 Created by MixedNuts
 
+**2.0.0 からは MixedNuts Mod Loader（1.0.0 以降）が必要です。** 1.x は単体で
+動作していましたが、2.0.0 はローダーのプラグインになりました。
+**Version 2.0.0 requires MixedNuts Mod Loader (1.0.0 or later).** 1.x ran on its own;
+2.0.0 is a plugin for the loader.
+
+https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+
 ---
 
 # 日本語
@@ -20,6 +27,8 @@ Created by MixedNuts
 ## 動作環境
 
 - FATAL FRAME II: Crimson Butterfly REMAKE（Steam 版）
+- **MixedNuts Mod Loader 1.0.0 以降**（別途導入が必要です）
+  https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 - 120Hz 以上に対応したディスプレイ
 - 120FPS を維持できる PC 性能
 - 空きディスク容量 約 20MB（初回起動時に作業用ファイルを生成します）
@@ -39,55 +48,95 @@ Created by MixedNuts
 
 | ファイル | 役割 |
 |---|---|
-| `dinput8.dll` | ローダー |
-| `Mods\native120fps\native120fps.dll` | 本体 |
-| `Mods\native120fps\native120fps.ini` | 設定ファイル |
-| `Mods\native120fps\README.md` | このファイル |
+| `MixedNuts\Mods\native120fps\native120fps.dll` | 本体 |
+| `MixedNuts\Mods\native120fps\native120fps.ini` | 設定ファイル |
+| `MixedNuts\Mods\native120fps\README.md` | このファイル |
+| `MixedNuts\Mods\native120fps\LICENSE.txt` | ライセンス |
 
-このうち **`dinput8.dll` と `Mods` フォルダの 2 つ**をコピーします。
+**`dinput8.dll` は同梱していません。** ローダー（`dinput8.dll` と
+`MixedNuts\MixedNutsLoader.dll`）は MixedNuts Mod Loader のものを使います。
+この配布物からは **`MixedNuts` フォルダ**をコピーします。
 
-初回起動時に、Mod が `Mods\native120fps\` の中へ次のファイルを自動生成します。
-いずれも削除して問題ありません（次回起動時に作り直されます）。
+起動時に、次のファイルが自動生成されます。いずれも削除して問題ありません
+（次回起動時に作り直されます）。
 
 | ファイル | 役割 |
 |---|---|
-| `native120fps.log` | ログ |
-| `archive_01.lnk` | 選択肢を 3 つにするための作業ファイル（約 8MB） |
-| `archive_06.lnk` | 表示ラベル差し替え用の作業ファイル（約 9MB） |
-| `*.lnk.tag` | 上記の世代管理用 |
+| `MixedNuts\Mods\native120fps\native120fps.log` | この Mod のログ |
+| `MixedNuts\cache\archive\archive_01.lnk` | 選択肢を 3 つにするための作業ファイル（約 8MB、ローダーが生成） |
+| `MixedNuts\cache\archive\archive_06.lnk` | 表示ラベル差し替え用の作業ファイル（約 9MB、ローダーが生成） |
+
+2 つの `.lnk` はローダーの共通キャッシュ `MixedNuts\cache\archive\` に置かれます。
+キャッシュはゲームのファイル、導入している Mod、その設定が変わると自動で
+作り直されます。
 
 ## 導入方法
 
 1. ゲームを終了します
 
-2. 同梱の `dinput8.dll` と `Mods` フォルダを、ゲームのルートディレクトリ
-   （`FatalFrameII.exe` と同じ場所）にそのままコピーします
+2. 先に **MixedNuts Mod Loader**（1.0.0 以降）を導入します。
+   https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader の Releases から
+   ダウンロードし、ローダーの README に従ってください
+
+3. この配布物の `MixedNuts` フォルダを、ゲームのルートディレクトリ
+   （`FatalFrameII.exe` と同じ場所）にそのままコピーします。
+   ローダーの `MixedNuts` フォルダに統合されます
 
    ```
-   ...\steamapps\common\FatalFrameII\FatalFrameII.exe
-   ...\steamapps\common\FatalFrameII\dinput8.dll         ← 追加
-   ...\steamapps\common\FatalFrameII\Mods\native120fps\  ← 追加
+   ...\FatalFrameII\FatalFrameII.exe
+   ...\FatalFrameII\dinput8.dll                                  ← MixedNuts Mod Loader
+   ...\FatalFrameII\MixedNuts\MixedNutsLoader.dll                ← MixedNuts Mod Loader
+   ...\FatalFrameII\MixedNuts\Mods\native120fps\native120fps.dll ← この Mod
+   ...\FatalFrameII\MixedNuts\Mods\native120fps\native120fps.ini
+   ...\FatalFrameII\MixedNuts\Mods\native120fps\native120fps.log ← 起動時に生成
+   ...\FatalFrameII\MixedNuts\cache\archive\archive_01.lnk       ← 初回起動時にローダーが生成
+   ...\FatalFrameII\MixedNuts\cache\archive\archive_06.lnk       ← 初回起動時にローダーが生成
    ```
 
    ゲームフォルダの開き方：Steam ライブラリでタイトルを右クリック →
    **管理** → **ローカルファイルを閲覧**
 
-3. ゲームを起動します
+4. ゲームを起動します
 
-4. **オプション → 画面設定 → 最大FPS** を開きます。
+5. **オプション → 画面設定 → 最大FPS** を開きます。
    選択肢が **「30 / 60 / 120」** の 3 つになっています
 
-5. **「120」を選び、タイトル画面まで戻る**と反映されます
+6. **「120」を選び、タイトル画面まで戻る**と反映されます
    （この設定はタイトルに戻ったタイミングで適用されます）
 
-6. 併せて **Vsync（垂直同期）を無効**にしてください。
+7. 併せて **Vsync（垂直同期）を無効**にしてください。
    有効のままだとモニタのリフレッシュレートで頭打ちになります
+
+### 1.x から更新する場合
+
+1. 導入前に、ゲームのルートにある古い `Mods\native120fps\` フォルダを削除します
+2. ローダーを導入するときに、古い `dinput8.dll` はローダーの `dinput8.dll` で
+   上書きします
+3. 他の MixedNuts の Mod も 1.x を使っている場合は、まとめて更新してください
+   （Mouse Wheel Camera Speed = `version.dll` + `Mods\wheelspeed\`、
+   TwinSwap = `xinput1_4.dll` + `Mods\twinswap\`）。詳しくはローダーの README を
+   参照してください
+
+古い 1.x の DLL がゲームのルートに残っていると、ローダーは対応する新しい Mod を
+読み込まず、`MixedNuts\loader.log` に `[!!]` で始まるメッセージを書き出します。
+
+### 他の Mod との併用
+
+Native 120FPS Option、Mouse Wheel Camera Speed、TwinSwap の 2.0.0 はすべて同じ
+ローダーの上で動くため、DLL を 1 つ共有し、互いに競合しません。
+
+別の Mod がすでに `dinput8.dll` を使っている場合は、上書きしないでください。
+ローダーの `dinput8.dll` は `version.dll` または `xinput1_4.dll` に名前を変えて
+使えます（ローダーの README を参照してください）。
 
 ## 削除方法
 
-`dinput8.dll` と `Mods` フォルダを削除するだけです。
+`MixedNuts\Mods\native120fps\` フォルダを削除するだけです。
 ゲームのファイルは一切変更していないため、完全に元に戻ります。
-自動生成されたファイルも `Mods` フォルダの中にしかないので、一緒に消えます。
+
+ローダーは他の Mod のために残しておいて構いません。すべて取り除く場合は、
+ローダー（`dinput8.dll` と `MixedNuts` フォルダ）も削除してください。
+自動生成された作業用ファイルも `MixedNuts` フォルダの中にしかないので、一緒に消えます。
 
 一時的に無効化したい場合は、`native120fps.ini` の `Enabled` を `0` にしてください。
 ファイルを消さずに素の状態で起動できます。
@@ -139,32 +188,45 @@ Created by MixedNuts
 - 120FPS を出すには相応の PC 性能と、120Hz 以上に対応したディスプレイが必要です
 - 垂直同期を切らないとモニタのリフレッシュレートで頭打ちになります
 - ゲームのアップデート後に動かなくなることがあります。その場合は Mod の更新をお待ちください
-- 初回起動時に約 17MB の作業用ファイルを `Mods\native120fps\` の中に生成します。
+- 初回起動時に約 17MB の作業用ファイルが `MixedNuts\cache\archive\` の中に生成されます。
   ゲーム側のファイルは読み取るだけで、書き換えません
 - ウイルス対策ソフトが誤検知することがあります。他プロセスのメモリを書き換える
   仕組みのためで、この Mod はネットワーク通信を一切行わず、ファイルを書き込むのも
-  自分のフォルダの中だけです
+  `MixedNuts` フォルダの中（Mod 自身のフォルダとローダーのキャッシュ）だけです
 
 ## うまく動かないとき
 
 選択肢が 2 つのままの場合、次を順に確認してください。
 
-1. `dinput8.dll` がゲームのルート（`FatalFrameII.exe` と同じ場所）にあるか。
-   **`Mods` フォルダの中ではありません**
-2. `Mods\native120fps\` の中に `native120fps.dll` があるか。
-   フォルダ名・ファイル名を変更していないか
+1. MixedNuts Mod Loader が導入されているか。`dinput8.dll` がゲームのルート
+   （`FatalFrameII.exe` と同じ場所）にあり（**`MixedNuts` フォルダの中ではありません**）、
+   `MixedNuts\MixedNutsLoader.dll` があるか
+2. `MixedNuts\loader.log` が生成されていて、`[OK] native120fps: loaded` の行があるか。
+   - `loader.log` 自体が無ければ、ローダーが読み込まれていません
+   - その行が無ければ、フォルダ名・ファイル名が
+     `MixedNuts\Mods\native120fps\native120fps.dll` になっているか確認し、
+     `loader.log` に `[!!]` や `[NG]` で始まる行が無いか見てください
 3. `native120fps.ini` の `Enabled` が `1` になっているか
-4. `Mods\native120fps\` に `native120fps.log` が生成されているか。
-   生成されていなければ `dinput8.dll` が読み込まれていません
+4. `MixedNuts\Mods\native120fps\` に `native120fps.log` が生成されているか
 
-ログに次の行が出ていれば正常に適用されています。
+`native120fps.log` に次の行が出ていれば正常に適用されています。
 
 ```
-[OK] Menu handler unlocked
-=== Done (attempt 2). The FPS option now has three entries ===
-[OK] Generated patched archive_01.lnk
-[OK] Generated patched archive_06.lnk
+[OK] Menu handler unlocked (RVA ..., exact signature)
+=== Done (attempt N). The FPS option now has three entries ===
 ```
+
+キャッシュを作る（作り直す）起動では、次の 2 行も出ます。
+
+```
+[OK] Generated patched archive\archive_01.lnk (...)
+[OK] Generated patched archive\archive_06.lnk (...)
+```
+
+2 回目以降の起動ではローダーがキャッシュを再利用するため、この 2 行は出ません。
+その場合は `MixedNuts\loader.log` に `[OK] Using the cached files (N)` と出ています。
+また、`loader.log` に `[OK] native120fps: loaded (2 file patches)` があれば、
+Mod はローダーに読み込まれています。
 
 ログは英語で出力されます。行の順序は前後することがあります（アーカイブの
 生成は、ゲームがそのファイルを開いた時点で行われます）。
@@ -181,10 +243,11 @@ Created by MixedNuts
 きりの良い数値に留まらず値が揺れます。きっちり 30 に張り付く場合は、どこかで
 上限が掛かっています。**
 
-1. `native120fps.log` の最終行が `=== Done ... ===` になっているか。
-   `=== Gave up ... code: ... table: OK ===` のようになっていれば、パッチが
-   片方しか当たっていません（この状態だと 3 つ目を選ぶと 30FPS になります）。
-   その場合、ログに `[!!]` で始まる説明が出ています
+1. `native120fps.log` に `=== Done ... ===` の行があるか。
+   `=== Gave up (N attempts / N ms, code: ...) ===` のあとに
+   `[!!] The code patch did NOT apply. ...` と出ていれば、コードパッチが
+   当たっていません。この状態でも 3 つ目の選択肢は表示されますが、選ぶと
+   30FPS になります
 2. NVIDIA コントロールパネルの **垂直同期**が「アダプティブ（ハーフリフレッシュ
    レート）」になっていないか。60Hz のディスプレイではちょうど 30FPS になります
 3. 同じ画面の **「最大フレームレート」**が低い値に設定されていないか
@@ -198,10 +261,10 @@ Created by MixedNuts
 ## 不具合の報告
 
 不具合を見つけた場合は、GitHub の Issue でご報告ください。その際、**必ず
-`native120fps.log` を添付してください。** ログが無いと原因を特定できず、
-対応できない場合があります。
+`MixedNuts\Mods\native120fps\native120fps.log` と `MixedNuts\loader.log` の 2 つを
+添付してください。** ログが無いと原因を特定できず、対応できない場合があります。
 
-ログには、ゲームのバージョンと Steam のビルド番号、画面の解像度と
+`native120fps.log` には、ゲームのバージョンと Steam のビルド番号、画面の解像度と
 リフレッシュレート、GPU 名、OS のビルド、保存されている FPS 設定が
 記録されます。ゲームのインストール先のパスも含まれるので、
 気になる場合はその行を消してから添付してください。
@@ -239,9 +302,10 @@ https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
 こちらはアーカイブの中のデータなので、メモリの書き換えでは足りません。ゲームが
 そのかたまりを同じ場所へ読み直すため、書き込んでもすぐ元に戻ってしまいます。
 
-そこで Mod は、**お使いのゲームフォルダにあるファイルを読み取り、必要な箇所だけを
-書き換えた複製を `Mods\native120fps\` の中に作り**、ゲームがそちらを読むように
-差し替えています。ゲーム側のファイルは読むだけです。
+そこで Mod は、この 2 つの書き換えをローダーに登録しています。ゲームが各アーカイブを
+初めて開くとき、ローダーは**お使いのゲームフォルダにある現在の内容を Mod に渡して
+必要な箇所だけを書き換えさせ、その複製を `MixedNuts\cache\archive\` から**ゲームに
+読ませます。ゲーム側のファイルは読むだけです。
 
 | ファイル | 書き換える内容 |
 |---|---|
@@ -274,6 +338,8 @@ hardcodes the choice to two entries, and this mod removes that restriction.
 ## Requirements
 
 - FATAL FRAME II: Crimson Butterfly REMAKE (Steam)
+- **MixedNuts Mod Loader 1.0.0 or later** (installed separately)
+  https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 - A display capable of 120Hz or higher
 - A PC able to sustain 120 FPS
 - About 20 MB of free disk space (working files are generated on first launch)
@@ -292,55 +358,95 @@ selected and 120 FPS works correctly.
 
 | File | Role |
 |---|---|
-| `dinput8.dll` | loader |
-| `Mods\native120fps\native120fps.dll` | the mod itself |
-| `Mods\native120fps\native120fps.ini` | configuration |
-| `Mods\native120fps\README.md` | this file |
+| `MixedNuts\Mods\native120fps\native120fps.dll` | the mod itself |
+| `MixedNuts\Mods\native120fps\native120fps.ini` | configuration |
+| `MixedNuts\Mods\native120fps\README.md` | this file |
+| `MixedNuts\Mods\native120fps\LICENSE.txt` | license |
 
-You copy two things: **`dinput8.dll` and the `Mods` folder.**
+**`dinput8.dll` is not included.** The loader files (`dinput8.dll` and
+`MixedNuts\MixedNutsLoader.dll`) come from MixedNuts Mod Loader. From this download
+you copy **the `MixedNuts` folder.**
 
-On first launch the mod generates the following inside `Mods\native120fps\`.
-All of them are safe to delete; they are rebuilt on the next launch.
+The following files are generated at launch. All of them are safe to delete; they
+are rebuilt on the next launch.
 
 | File | Role |
 |---|---|
-| `native120fps.log` | log |
-| `archive_01.lnk` | working file that gives the option a third entry (~8 MB) |
-| `archive_06.lnk` | working file that supplies the third label (~9 MB) |
-| `*.lnk.tag` | version markers for the above |
+| `MixedNuts\Mods\native120fps\native120fps.log` | this mod's log |
+| `MixedNuts\cache\archive\archive_01.lnk` | working file that gives the option a third entry (~8 MB, generated by the loader) |
+| `MixedNuts\cache\archive\archive_06.lnk` | working file that supplies the third label (~9 MB, generated by the loader) |
+
+The two `.lnk` files live in the loader's shared cache, `MixedNuts\cache\archive\`.
+The cache is rebuilt automatically when the game's files, the installed mods or
+their settings change.
 
 ## Installation
 
 1. Close the game.
 
-2. Copy `dinput8.dll` and the `Mods` folder into the game's root directory
-   (the folder containing `FatalFrameII.exe`).
+2. First install **MixedNuts Mod Loader** (1.0.0 or later). Download it from the
+   Releases of https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+   and follow the loader's README.
+
+3. Copy this download's `MixedNuts` folder into the game's root directory
+   (the folder containing `FatalFrameII.exe`). It merges into the loader's
+   `MixedNuts` folder.
 
    ```
-   ...\steamapps\common\FatalFrameII\FatalFrameII.exe
-   ...\steamapps\common\FatalFrameII\dinput8.dll         <- added
-   ...\steamapps\common\FatalFrameII\Mods\native120fps\  <- added
+   ...\FatalFrameII\FatalFrameII.exe
+   ...\FatalFrameII\dinput8.dll                                  <- MixedNuts Mod Loader
+   ...\FatalFrameII\MixedNuts\MixedNutsLoader.dll                <- MixedNuts Mod Loader
+   ...\FatalFrameII\MixedNuts\Mods\native120fps\native120fps.dll <- this mod
+   ...\FatalFrameII\MixedNuts\Mods\native120fps\native120fps.ini
+   ...\FatalFrameII\MixedNuts\Mods\native120fps\native120fps.log <- generated at launch
+   ...\FatalFrameII\MixedNuts\cache\archive\archive_01.lnk       <- generated on first launch (by the loader)
+   ...\FatalFrameII\MixedNuts\cache\archive\archive_06.lnk       <- generated on first launch (by the loader)
    ```
 
    To open the game folder: right-click the title in your Steam library →
    **Manage** → **Browse local files**
 
-3. Launch the game.
+4. Launch the game.
 
-4. Open **Options → Screen Settings → Max FPS**.
+5. Open **Options → Screen Settings → Max FPS**.
    The option now has three entries: **30 / 60 / 120**.
 
-5. **Select 120 and return to the title screen** to apply it.
+6. **Select 120 and return to the title screen** to apply it.
    (This setting takes effect when you return to the title screen.)
 
-6. Also **turn V-Sync off.** With it on, the frame rate is capped at your
+7. Also **turn V-Sync off.** With it on, the frame rate is capped at your
    monitor's refresh rate.
+
+### Upgrading from 1.x
+
+1. Before installing, delete the old `Mods\native120fps\` folder from the game root.
+2. When you install the loader, overwrite the old `dinput8.dll` with the loader's
+   `dinput8.dll`.
+3. If you also use the other MixedNuts mods at 1.x (Mouse Wheel Camera Speed =
+   `version.dll` + `Mods\wheelspeed\`, TwinSwap = `xinput1_4.dll` + `Mods\twinswap\`),
+   update them all at once. See the loader's README for details.
+
+If an old 1.x DLL is still in the game root, the loader does not load the
+corresponding new mod and writes a message starting with `[!!]` to
+`MixedNuts\loader.log`.
+
+### Using with other mods
+
+Native 120FPS Option, Mouse Wheel Camera Speed and TwinSwap 2.0.0 all run on the same
+loader, so they share one DLL and never conflict.
+
+If another mod already uses `dinput8.dll`, do not overwrite it. The loader's
+`dinput8.dll` can be renamed to `version.dll` or `xinput1_4.dll` (see the loader's
+README).
 
 ## Uninstallation
 
-Simply delete `dinput8.dll` and the `Mods` folder. No game files are modified,
-so removal restores the original state completely. The generated files live only
-inside the `Mods` folder, so they go with it.
+Simply delete the `MixedNuts\Mods\native120fps\` folder. No game files are modified,
+so removal restores the original state completely.
+
+The loader can stay for other mods. To remove everything, delete the loader too
+(`dinput8.dll` and the `MixedNuts` folder). The generated working files live only
+inside the `MixedNuts` folder, so they go with it.
 
 To disable temporarily without deleting anything, set `Enabled` to `0` in
 `native120fps.ini`.
@@ -393,31 +499,46 @@ position. Use an overlay (NVIDIA, AMD, Steam) to check the real frame rate.
 - Turn V-Sync off, otherwise the frame rate is capped at your monitor's refresh rate
 - A game update may break this mod. Please wait for an updated release if that happens
 - On first launch, about 17 MB of working data is generated inside
-  `Mods\native120fps\`. The game's own files are only read, never written
+  `MixedNuts\cache\archive\`. The game's own files are only read, never written
 - Antivirus software may flag this mod. It writes to the memory of another process,
   which is a common false-positive trigger. This mod performs no network activity,
-  and the only files it writes are inside its own folder
+  and the only files written are inside the `MixedNuts` folder (the mod's own folder
+  and the loader's cache)
 
 ## If it doesn't work
 
 If the option still shows only two entries, check the following:
 
-1. Is `dinput8.dll` in the game's root folder (next to `FatalFrameII.exe`)?
-   **It does not go inside the `Mods` folder**
-2. Is `native120fps.dll` present in `Mods\native120fps\`?
-   Have the folder or file names been changed?
+1. Is MixedNuts Mod Loader installed? `dinput8.dll` must be in the game's root
+   folder (next to `FatalFrameII.exe`, **not inside the `MixedNuts` folder**), and
+   `MixedNuts\MixedNutsLoader.dll` must be present
+2. Does `MixedNuts\loader.log` exist, and does it have the
+   `[OK] native120fps: loaded` line?
+   - If `loader.log` is missing, the loader is not being loaded at all
+   - If the line is missing, check that the folder and file names are
+     `MixedNuts\Mods\native120fps\native120fps.dll`, and look for lines starting
+     with `[!!]` or `[NG]` in `loader.log`
 3. Is `Enabled` set to `1` in `native120fps.ini`?
-4. Has `native120fps.log` been created in `Mods\native120fps\`?
-   If not, `dinput8.dll` is not being loaded at all
+4. Has `native120fps.log` been created in `MixedNuts\Mods\native120fps\`?
 
-If the log contains these lines, the patch was applied correctly:
+If `native120fps.log` contains these lines, the patch was applied correctly:
 
 ```
-[OK] Menu handler unlocked
-=== Done (attempt 2). The FPS option now has three entries ===
-[OK] Generated patched archive_01.lnk
-[OK] Generated patched archive_06.lnk
+[OK] Menu handler unlocked (RVA ..., exact signature)
+=== Done (attempt N). The FPS option now has three entries ===
 ```
+
+On a launch where the cache is built (or rebuilt), these two lines appear as well:
+
+```
+[OK] Generated patched archive\archive_01.lnk (...)
+[OK] Generated patched archive\archive_06.lnk (...)
+```
+
+On later launches the loader reuses the cache, so those two lines do not appear;
+`MixedNuts\loader.log` shows `[OK] Using the cached files (N)` instead. If
+`loader.log` has `[OK] native120fps: loaded (2 file patches)`, the loader has
+loaded the mod.
 
 The order of those lines can vary: each archive is generated at the moment the
 game first opens that file.
@@ -434,10 +555,11 @@ If you really are measuring 30 FPS, check the following in order. **When a GPU
 simply can't keep up, the frame rate fluctuates rather than sitting on a round
 number; a rock-steady 30 means something is capping it.**
 
-1. Does the last line of `native120fps.log` read `=== Done ... ===`? If it
-   reads `=== Gave up ... code: ... table: OK ===` instead, only one of the two
-   patches applied — in that state, picking the third entry does give you 30
-   FPS. The log explains what happened on the lines starting with `[!!]`
+1. Does `native120fps.log` have the `=== Done ... ===` line? If it shows
+   `=== Gave up (N attempts / N ms, code: ...) ===` followed by
+   `[!!] The code patch did NOT apply. ...`, the code patch did not apply. The
+   third entry still appears in the menu in that state, but selecting it gives
+   you 30 FPS
 2. In the NVIDIA Control Panel, is **Vertical sync** set to "Adaptive (half refresh
    rate)"? On a 60 Hz display that caps the game at exactly 30 FPS
 3. On the same page, is **"Max Frame Rate"** set to a low value?
@@ -450,11 +572,12 @@ number; a rock-steady 30 means something is capping it.**
 
 ## Reporting issues
 
-If you run into a problem, please open a GitHub Issue. **Be sure to attach
-`native120fps.log`.** Without the log the cause usually cannot be identified,
-and the issue may not be actionable.
+If you run into a problem, please open a GitHub Issue. **Be sure to attach both
+`MixedNuts\Mods\native120fps\native120fps.log` and `MixedNuts\loader.log`.**
+Without the logs the cause usually cannot be identified, and the issue may not be
+actionable.
 
-The log records the game version and Steam build number, your screen resolution
+`native120fps.log` records the game version and Steam build number, your screen resolution
 and refresh rate, your GPU name, the Windows build, and the frame rate value the
 game has saved. It also contains the path the game is installed to — feel free to
 delete that line before attaching it if you would rather not share it.
@@ -492,9 +615,10 @@ in memory after the game starts. **Only 8 bytes are written.**
 Those two live inside the game's archives, and writing to memory is not enough: the
 game reloads those blocks into the same address, so any write is quickly undone.
 
-Instead the mod **reads the files from your own game folder, writes copies with just
-the necessary bytes changed into `Mods\native120fps\`**, and makes the game open those
-copies instead. The game's own files are only read.
+Instead the mod registers those two changes with the loader. When the game first
+opens each archive, the loader **has the mod change just the necessary bytes in the
+current contents from your own game folder, and serves the result from
+`MixedNuts\cache\archive\`.** The game's own files are only read.
 
 | File | What is changed |
 |---|---|

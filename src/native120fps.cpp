@@ -5,16 +5,20 @@
 // ゲーム本体は Steam DRM により .text が暗号化されているため、ファイルへの
 // 静的パッチはできない。復号後のメモリに対して実行時にパッチを当てる。
 //
-// ここで行うのは 1 つだけ:
-//   メニューの FPS 項目ハンドラが選択インデックス 0/1 しか受け付けない
-//   ハードコードを解除する（8 バイト）
+// 行うのは 3 つ:
+//   1. メニューの FPS 項目ハンドラが選択インデックス 0/1 しか受け付けない
+//      ハードコードを解除する（8 バイト。メモリ上）
+//   2. archive_01.lnk の選択肢テーブルを 2 択 → 3 択にする
+//   3. archive_06.lnk の 3 つ目の選択肢のラベルを "120" にする
 //
-// 選択肢を 3 つに増やす処理と、3 つ目のラベルを "120" にする処理は、
-// ローダ側が archive_01.lnk / archive_06.lnk の改変版を用意して行う。
+// 2 と 3 は MixedNuts Mod Loader にファイル改変として登録し、改変版は初回起動時に
+// ゲームのファイルから生成する（MixedNuts\cache）。ゲームのファイルは一切変更しないし、
+// ゲームデータを同梱することもない。
 // 1.0.2 までは選択肢テーブルをメモリ上で探していたが、ゲームが確保する
 // 4〜8GB の領域を走査する必要があり、適用まで最悪 17 秒かかっていた。
 //
-// ゲームのファイルは一切変更しない。
+// MixedNuts Mod Loader のプラグインとして MixedNuts\Mods\native120fps\ に置く
+// （2.0.0 から。1.x は dinput8.dll のプロキシで単独で動いていた）。
 //
 // ログは英語で書く。配布先の利用者は大半が英語話者で、日本語のログでは
 // 自分の状況を判断できず、こちらへ丸投げするしかなくなる（1.0.1 で実際に
@@ -22,27 +26,32 @@
 
 #include <windows.h>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <vector>
 
+#include <mixednuts/plugin.h>
+#include <mixednuts/bytes.hpp>
 #include <mixednuts/code.hpp>
 #include <mixednuts/env.hpp>
 #include <mixednuts/file.hpp>
 #include <mixednuts/ini.hpp>
 #include <mixednuts/log.hpp>
-#include <mixednuts/path.hpp>
 
 namespace {
 
 using mixednuts::Log;
+using mixednuts::Rd;
 using mixednuts::Utf8;
+using mixednuts::Wr;
 using mixednuts::code::Hex;
 using mixednuts::code::Rva;
 
-constexpr char kVersion[] = "1.1.0";
+constexpr char kVersion[] = "2.0.0";
 
-bool g_enabled  = true;
+bool     g_enabled = true;
+uint32_t g_labelId = 0x00D9E01F;   // 3 つ目の選択肢に使う未使用の文字列ID
 bool g_diagnose = false;   // ini: Diagnose=1 のときだけ追加の診断を出す
 
 // ---- シグネチャ ---------------------------------------------------------
@@ -396,28 +405,188 @@ void WatchFpsIndex()
     Log("[??] Stopped watching the frame rate index (last value %u)", cur);
 }
 
+// ---- 改変1: archive_01.lnk の選択肢テーブルを 3 択にする ----------------
+//
+// OPTION_MENU_SELECT_ECB の最大FPS 行（sel r30）は
+//   [選択肢数][選択肢1のID][選択肢2のID][選択肢3のID]
+// と並ぶ。選択肢1が "30"、選択肢2が "60" の文字列IDで、3 つ目は空。
+// 選択肢数を 3 にして 3 つ目に未使用の文字列IDを入れると、メニューの
+// 選択肢が 3 つになる。
+//
+// 位置は決め打ちにせず、ID の隣接で探して ECB ブロック先頭の 'ecb\0' で
+// 裏取りする。実測ではファイル全体でちょうど 1 箇所だけ一致する。
+
+const uint32_t kId30 = 0x00D24344;   // "30"
+const uint32_t kId60 = 0x00CB7EE4;   // "60"
+
+// ブロック先頭からの相対位置: 0x20（ヘッダ） + 30行 * 56バイト + 8 = 0x6B8
+const size_t kEcbHeaderBack = 0x6B8;
+
+bool PatchChoiceTable(std::vector<uint8_t>& buf, char* note, size_t cap)
+{
+    size_t at = 0;
+    int hits = 0;
+    for (size_t o = kEcbHeaderBack + 4; o + 12 <= buf.size(); o += 4)
+    {
+        if (Rd<uint32_t>(&buf[o]) != kId30) continue;
+        if (Rd<uint32_t>(&buf[o + 4]) != kId60) continue;
+
+        const uint8_t* h = &buf[o - kEcbHeaderBack];
+        if (!(h[0] == 'e' && h[1] == 'c' && h[2] == 'b' && h[3] == 0)) continue;
+
+        ++hits;
+        at = o;
+    }
+    if (hits != 1)
+    {
+        sprintf_s(note, cap, "%d candidate rows found (expected exactly 1)", hits);
+        return false;
+    }
+
+    uint8_t* count = &buf[at - 4];
+    uint8_t* slot3 = &buf[at + 8];
+
+    if (Rd<uint32_t>(count) == 3 && Rd<uint32_t>(slot3) == g_labelId)
+    {
+        sprintf_s(note, cap, "already 3 entries");
+        return true;
+    }
+    // 想定外の値を上書きしない。空であることを確認してから書く。
+    if (Rd<uint32_t>(count) != 2 || Rd<uint32_t>(slot3) != 0)
+    {
+        sprintf_s(note, cap, "unexpected values (count=%u, slot3=0x%08X)",
+                  Rd<uint32_t>(count), Rd<uint32_t>(slot3));
+        return false;
+    }
+
+    Wr<uint32_t>(count, 3);
+    Wr<uint32_t>(slot3, g_labelId);
+    sprintf_s(note, cap, "row at 0x%llX, label ID 0x%08X",
+              static_cast<unsigned long long>(at - 4), g_labelId);
+    return true;
+}
+
+// ---- 改変2: archive_06.lnk のラベルを "120" にする ----------------------
+//
+// 各言語の MES_MENU ブロックには、16バイト固定スロットで "30" と "60"
+// （最大FPSの選択肢ラベル）が隣接して並んでいる。その 3 つ先のスロットが
+// 未使用枠で、そこを "120" に書き換えると 3 つ目の選択肢のラベルになる。
+//
+// 「16バイト境界の "30" の直後16バイトが "60"」という条件で探すと、
+// 実測では言語数ぶんちょうど 10 箇所だけが一致する。
+
+const uint8_t kLbl30[6] = { 0x33, 0x00, 0x30, 0x00, 0x00, 0x00 };    // "30"
+const uint8_t kLbl60[6] = { 0x36, 0x00, 0x30, 0x00, 0x00, 0x00 };    // "60"
+const uint8_t kLbl120[16] = { 0x31, 0x00, 0x32, 0x00, 0x30, 0x00 };  // "120" + 0 埋め
+
+// 書き込んでよいのは「空」か「既知のプレースホルダ」のスロットだけ。
+//
+// 言語によっては、この枠が直前のメッセージの続きとして使われている
+// （イタリア語の "Macchina fotografica" など）。そこへ書くと元の文が
+// 切り詰められてしまうため、そういう枠には触れない。
+// 公式に対応するのは日本語と英語で、この 2 言語はいずれも条件を満たす。
+const uint8_t kPlaceholder[22] = {                 // "[[3537079]]"（日本語版）
+    0x5B, 0x00, 0x5B, 0x00, 0x33, 0x00, 0x35, 0x00, 0x33, 0x00, 0x37, 0x00,
+    0x30, 0x00, 0x37, 0x00, 0x39, 0x00, 0x5D, 0x00, 0x5D, 0x00,
+};
+
+bool SlotIsWritable(const uint8_t* slot)
+{
+    if (slot[0] == 0x00 && slot[1] == 0x00) return true;              // 空
+    return memcmp(slot, kPlaceholder, sizeof(kPlaceholder)) == 0;     // 既知の枠
+}
+
+bool PatchLabels(std::vector<uint8_t>& buf, char* note, size_t cap)
+{
+    int n = 0, skipped = 0;
+    if (buf.size() >= 0x100)
+    {
+        for (size_t o = 0; o + 16 * 4 <= buf.size(); o += 16)
+        {
+            if (memcmp(&buf[o], kLbl30, sizeof(kLbl30)) != 0) continue;
+            if (memcmp(&buf[o + 16], kLbl60, sizeof(kLbl60)) != 0) continue;
+
+            uint8_t* slot = &buf[o + 16 * 3];        // スロット 257
+            if (!SlotIsWritable(slot))
+            {
+                ++skipped;                           // 他のメッセージが使っている枠
+                continue;
+            }
+            memcpy(slot, kLbl120, sizeof(kLbl120));
+            ++n;
+        }
+    }
+    if (n == 0)
+    {
+        sprintf_s(note, cap, "no writable label slot found");
+        return false;
+    }
+    sprintf_s(note, cap, "%d languages patched / %d skipped", n, skipped);
+    return true;
+}
+
+// ---- ローダーへの登録 ---------------------------------------------------
+//
+// ゲームがアーカイブを初めて開いたときにローダーから呼ばれ、現在の内容を
+// 改変して返す。生成物のキャッシュと差し替えはローダーが行う。
+
+using PatchFn = bool (*)(std::vector<uint8_t>&, char*, size_t);
+
+struct ArchiveJob {
+    const wchar_t* targets[2];   // 対象（NULL 終端）
+    const char*    tag;          // 改変ロジックの版。変えたら上げる
+    PatchFn        patch;
+};
+
+const ArchiveJob kJobs[] = {
+    { { L"archive\\archive_01.lnk", nullptr }, "archive01-v1", &PatchChoiceTable },
+    { { L"archive\\archive_06.lnk", nullptr }, "archive06-v2", &PatchLabels },
+};
+
+int GenerateArchive(void* ctx, const MixedNutsPatchIo* io, char* note, size_t cap)
+{
+    const auto& job = *static_cast<const ArchiveJob*>(ctx);
+    const std::string name = Utf8(job.targets[0]);
+    const uint8_t* data = nullptr;
+    size_t size = 0;
+    if (!io->Read(io->self, job.targets[0], &data, &size))
+    {
+        sprintf_s(note, cap, "cannot read %s", name.c_str());
+        Log("[NG] Cannot read %s", name.c_str());
+        return 0;
+    }
+    std::vector<uint8_t> buf(data, data + size);
+    if (!job.patch(buf, note, cap))
+    {
+        Log("[NG] Could not patch %s: %s. A game update may have changed the"
+            " layout. Please report this log.", name.c_str(), note);
+        return 0;
+    }
+    if (!io->Write(io->self, job.targets[0], buf.data(), buf.size()))
+    {
+        sprintf_s(note, cap, "cannot write %s", name.c_str());
+        return 0;
+    }
+    Log("[OK] Generated patched %s (%s / %zu bytes)", name.c_str(), note, buf.size());
+    return 1;
+}
+
 // ---- 設定読み込み -------------------------------------------------------
 
-void LoadConfig(HMODULE self)
+void LoadConfig(const std::wstring& dir)
 {
     namespace ini = mixednuts::ini;
-    const std::wstring dir = mixednuts::ModuleDir(self);
     const std::wstring file = dir + L"native120fps.ini";
     mixednuts::log::Open(dir, L"native120fps.log", ini::Bool(file, L"General", L"Log", true));
     g_diagnose = ini::Bool(file, L"General", L"Diagnose", false);
     g_enabled  = ini::Bool(file, L"General", L"Enabled", true);
     g_fpsIndexRva = static_cast<uint32_t>(ini::Int(file, L"Patch", L"FpsIndexRva", 0x2C31808));
+    g_labelId = static_cast<uint32_t>(ini::Int(file, L"Patch", L"LabelId", 0x00D9E01F));
+    if (g_labelId == 0) g_labelId = 0x00D9E01F;
 }
 
-DWORD WINAPI Worker(LPVOID param)
+DWORD WINAPI Worker(LPVOID)
 {
-    LoadConfig(static_cast<HMODULE>(param));
-    if (!g_enabled)
-    {
-        Log("[--] Enabled=0, doing nothing");
-        return 0;
-    }
-
     Log("=== Native 120FPS Option %s / Created by MixedNuts ===", kVersion);
     LogEnvironment();
 
@@ -477,13 +646,36 @@ DWORD WINAPI Worker(LPVOID param)
 
 } // namespace
 
+// MixedNuts Mod Loader から、ゲームのコードが動く前に呼ばれる。
+// アーカイブの改変を登録し、コードパッチは別スレッドで始める。
+MIXEDNUTS_PLUGIN_EXPORT int WINAPI MixedNutsPluginInit(const MixedNutsApi* api)
+{
+    if (!api || api->version < MIXEDNUTS_API_VERSION) return 0;
+    LoadConfig(api->pluginDir);
+    if (!g_enabled)
+    {
+        Log("[--] Enabled=0, doing nothing");
+        return 1;
+    }
+
+    // tag には結果に影響する設定（ラベルID）も入れる。変わればローダーが作り直す
+    static char tags[2][64];
+    for (size_t i = 0; i < 2; ++i)
+    {
+        sprintf_s(tags[i], "%s label=%08X", kJobs[i].tag, g_labelId);
+        const MixedNutsPatch patch{ kJobs[i].targets, tags[i], &GenerateArchive,
+                                    const_cast<ArchiveJob*>(&kJobs[i]) };
+        if (!api->RegisterPatch(api, &patch))
+            Log("[NG] Could not register the %s patch", Utf8(kJobs[i].targets[0]).c_str());
+    }
+
+    if (HANDLE t = CreateThread(nullptr, 0, Worker, nullptr, 0, nullptr))
+        CloseHandle(t);
+    return 1;
+}
+
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD reason, LPVOID)
 {
-    if (reason == DLL_PROCESS_ATTACH)
-    {
-        DisableThreadLibraryCalls(hModule);
-        if (HANDLE t = CreateThread(nullptr, 0, Worker, hModule, 0, nullptr))
-            CloseHandle(t);
-    }
+    if (reason == DLL_PROCESS_ATTACH) DisableThreadLibraryCalls(hModule);
     return TRUE;
 }

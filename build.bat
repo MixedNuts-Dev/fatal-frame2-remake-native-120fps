@@ -10,29 +10,28 @@ if errorlevel 1 exit /b 1
 set "ROOT=%~dp0"
 set "OUT=%ROOT%dist"
 set "OBJ=%ROOT%obj"
-set "COMMON=%ROOT%mod-loader\common"
-if not exist "%COMMON%\mixednuts\log.hpp" (echo [NG] mod-loader submodule is missing. Run: git submodule update --init & exit /b 1)
-if not exist "%OUT%\Mods\native120fps" mkdir "%OUT%\Mods\native120fps"
+set "LOADER=%ROOT%mod-loader"
+rem set MIXEDNUTS_LOADER to build against a local checkout of mod-loader instead
+if defined MIXEDNUTS_LOADER set "LOADER=%MIXEDNUTS_LOADER%"
+if not exist "%LOADER%\api\mixednuts\plugin.h" (echo [NG] mod-loader submodule is missing or old. Run: git submodule update --init & exit /b 1)
+rem a MixedNuts Mod Loader plugin: MixedNuts\Mods\native120fps\native120fps.dll
+set "DST=%OUT%\MixedNuts\Mods\native120fps"
+if exist "%OUT%" rmdir /s /q "%OUT%"
+mkdir "%DST%"
 if not exist "%OBJ%" mkdir "%OBJ%"
 
-echo === loader (dinput8.dll) ===
-cl /nologo /LD /O2 /EHsc /MT /W3 /std:c++17 /utf-8 /DNDEBUG /I"%COMMON%" /Fo"%OBJ%\l_" /Fe"%OUT%\dinput8.dll" "%ROOT%src\loader\dinput8.cpp" /link /DEF:"%ROOT%src\loader\dinput8.def" /OPT:REF /OPT:ICF user32.lib
-if errorlevel 1 exit /b 1
-
-echo === payload (native120fps.dll) ===
-cl /nologo /LD /O2 /EHsc /MT /W3 /std:c++17 /utf-8 /DNDEBUG /I"%COMMON%" /Fo"%OBJ%\p_" /Fe"%OUT%\Mods\native120fps\native120fps.dll" "%ROOT%src\payload\native120fps.cpp" /link /OPT:REF /OPT:ICF version.lib user32.lib
+echo === plugin (native120fps.dll) ===
+cl /nologo /LD /O2 /EHsc /MT /W3 /std:c++17 /utf-8 /DNDEBUG /I"%LOADER%\common" /I"%LOADER%\api" /Fo"%OBJ%\p_" /Fe"%DST%\native120fps.dll" "%ROOT%src\native120fps.cpp" /link /OPT:REF /OPT:ICF
 if errorlevel 1 exit /b 1
 
 echo === copying package files ===
-copy /y "%ROOT%package\Mods\native120fps\native120fps.ini" "%OUT%\Mods\native120fps\" >nul
-copy /y "%ROOT%package\Mods\native120fps\README.md" "%OUT%\Mods\native120fps\" >nul
-copy /y "%ROOT%LICENSE" "%OUT%\Mods\native120fps\LICENSE.txt" >nul
+copy /y "%ROOT%package\Mods\native120fps\native120fps.ini" "%DST%\" >nul
+copy /y "%ROOT%package\Mods\native120fps\README.md" "%DST%\" >nul
+copy /y "%ROOT%LICENSE" "%DST%\LICENSE.txt" >nul
 
-rem stale output from earlier builds
-if exist "%OUT%\Mods\native120fps\README.txt" del "%OUT%\Mods\native120fps\README.txt"
 rem import library / export file are build by-products
-if exist "%OUT%\dinput8.lib" del "%OUT%\dinput8.lib"
-if exist "%OUT%\dinput8.exp" del "%OUT%\dinput8.exp"
+if exist "%DST%\native120fps.lib" del "%DST%\native120fps.lib"
+if exist "%DST%\native120fps.exp" del "%DST%\native120fps.exp"
 
 echo.
 echo === done: %OUT% ===

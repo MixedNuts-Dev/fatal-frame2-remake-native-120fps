@@ -15,6 +15,14 @@ By default only 30 and 60 are selectable.
 **The game already supports 120 FPS internally.** The menu handler simply hardcodes
 the choice list to two entries, and this mod removes that restriction.
 
+> **2.0.0 からは [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)（1.0.0 以降）が必要です。**
+> 1.x は単体で動作していましたが、2.0.0 はローダーのプラグインになり、`dinput8.dll` を
+> 同梱しなくなりました。ローダーは別途導入してください。
+>
+> **Version 2.0.0 requires [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader) (1.0.0 or later).**
+> 1.x ran on its own; 2.0.0 is a plugin for the loader and no longer ships `dinput8.dll`.
+> Install the loader separately.
+
 ## 他の jsonを直接書き換える場合との違い / How this differs from editing the json directly
 
 設定ファイル（`graphics_option.json`）を直接書き換える方法とは、次の点が異なります。
@@ -25,11 +33,11 @@ This differs from editing the `graphics_option.json` settings file by hand:
   **"120" appears as a real option in the in-game settings screen.** No manual file
   editing — you pick it from the menu like any other setting.
 - **ゲームのファイルを一切変更しません。** 書き換えるのは実行中のメモリと、
-  Mod 自身のフォルダ内に生成した作業用ファイルだけです。導入した 2 つを消せば
-  完全に元へ戻ります。
+  `MixedNuts` フォルダ内に生成される作業用ファイルだけです。Mod とローダーを
+  消せば完全に元へ戻ります。
   **No game files are modified at all.** The mod only writes to process memory at
-  runtime and to a working file it generates inside its own folder; deleting the
-  two added items restores the original state completely.
+  runtime and to working files generated inside the `MixedNuts` folder; deleting the
+  mod and the loader restores the original state completely.
 - 直接書き換える方法では、ゲーム内でグラフィック設定を変更するたびに値が
   上書きされてしまいますが、この Mod ではその問題が起きません。
   When the file is edited by hand, the value is overwritten whenever you change any
@@ -37,32 +45,45 @@ This differs from editing the `graphics_option.json` settings file by hand:
 
 ## 導入 / Installation
 
-**ビルドは不要です。** [Releases](../../releases) から配布物をダウンロードし、
-中身の `dinput8.dll` と `Mods` フォルダを、ゲームのルート（`FatalFrameII.exe` と
-同じ場所）にそのままコピーするだけです。
+**ビルドは不要です。**
 
-**No build required.** Download the archive from [Releases](../../releases) and copy
-`dinput8.dll` and the `Mods` folder into the game's root directory (the folder
-containing `FatalFrameII.exe`).
+1. 先に [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
+   （1.0.0 以降）を、その Releases からダウンロードして導入します
+2. この Mod の [Releases](../../releases) から配布物をダウンロードし、中身の
+   `MixedNuts` フォルダを、ゲームのルート（`FatalFrameII.exe` と同じ場所）に
+   そのままコピーします。ローダーの `MixedNuts` フォルダに統合されます
+
+**No build required.**
+
+1. First install [MixedNuts Mod Loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
+   (1.0.0 or later), downloaded from its Releases.
+2. Download this mod from [Releases](../../releases) and copy its `MixedNuts` folder
+   into the game's root directory (the folder containing `FatalFrameII.exe`). It
+   merges into the loader's `MixedNuts` folder.
 
 ```
 FatalFrameII/
   FatalFrameII.exe
-  dinput8.dll                          <- added
-  Mods/native120fps/native120fps.dll   <- added
-  Mods/native120fps/native120fps.ini
-  Mods/native120fps/README.md
-  Mods/native120fps/native120fps.log   <- 起動時に生成 / generated at launch
-  Mods/native120fps/archive_01.lnk     <- 初回起動時に生成 / generated on first launch
-  Mods/native120fps/archive_01.lnk.tag
-  Mods/native120fps/archive_06.lnk     <- 初回起動時に生成 / generated on first launch
-  Mods/native120fps/archive_06.lnk.tag
+  dinput8.dll                                  <- MixedNuts Mod Loader
+  MixedNuts/MixedNutsLoader.dll                <- MixedNuts Mod Loader
+  MixedNuts/Mods/native120fps/native120fps.dll <- この Mod / this mod
+  MixedNuts/Mods/native120fps/native120fps.ini
+  MixedNuts/Mods/native120fps/README.md
+  MixedNuts/Mods/native120fps/LICENSE.txt
+  MixedNuts/Mods/native120fps/native120fps.log <- 起動時に生成 / generated at launch
+  MixedNuts/cache/archive/archive_01.lnk       <- 初回起動時にローダーが生成 / generated on first launch (by the loader)
+  MixedNuts/cache/archive/archive_06.lnk       <- 初回起動時にローダーが生成 / generated on first launch (by the loader)
 ```
 
-2 つの `.lnk` は初回起動時に Mod が自動生成します（合計 約 17MB）。ゲーム側の
-同名ファイルには一切手を加えません。
-The two `.lnk` files (about 17 MB in total) are generated automatically on first
-launch. The game's own copies are never touched.
+2 つの `.lnk`（合計 約 17MB）は、初回起動時にローダーが共通のキャッシュフォルダ
+`MixedNuts\cache\archive\` に自動生成します。ゲーム側の同名ファイルには一切
+手を加えません。キャッシュはゲームのファイル、導入している Mod、その設定が
+変わると自動で作り直されます。削除しても問題ありません（次回起動時に作り直されます）。
+The two `.lnk` files (about 17 MB in total) are generated automatically by the loader
+on first launch, in the shared cache folder `MixedNuts\cache\archive\`. The game's own
+copies are never touched. The cache is rebuilt automatically when the game's files,
+the installed mods or their settings change, and it is safe to delete (it is rebuilt
+on the next launch).
 
 ゲームを起動し、オプション → グラフィック設定を開くと、最大 FPS が 3 択になります。
 3 つ目を選び、タイトル画面まで戻ると反映されます。
@@ -70,7 +91,53 @@ launch. The game's own copies are never touched.
 Launch the game and open Options → Graphics Settings; the max FPS option now has three
 entries. Select the third one and return to the title screen to apply it.
 
-削除は 2 つを消すだけです。 / To uninstall, just delete them.
+削除は `MixedNuts\Mods\native120fps\` を消すだけです。ローダーは他の Mod のために
+残しておいて構いません。すべて取り除く場合は、ローダー（`dinput8.dll` と `MixedNuts`
+フォルダ）も削除してください。一時的に無効化する場合は、`native120fps.ini` の
+`Enabled` を `0` にします。
+
+To uninstall, delete `MixedNuts\Mods\native120fps\`. The loader can stay for other
+mods; to remove everything, delete the loader too (`dinput8.dll` and the `MixedNuts`
+folder). To disable temporarily, set `Enabled=0` in `native120fps.ini`.
+
+### 1.x からの更新 / Upgrading from 1.x
+
+1. 導入前に、ゲームのルートから古い `Mods\native120fps\` フォルダを削除します
+2. ローダーを導入するときに、古い `dinput8.dll` をローダーの `dinput8.dll` で
+   上書きします
+3. 他の MixedNuts の Mod（Mouse Wheel Camera Speed = `version.dll` + `Mods\wheelspeed\`、
+   TwinSwap = `xinput1_4.dll` + `Mods\twinswap\`）も 1.x を使っている場合は、
+   まとめて更新してください。詳しくはローダーの README を参照してください
+
+古い 1.x の DLL がゲームのルートに残っていると、ローダーは対応する新しい Mod を
+読み込まず、`MixedNuts\loader.log` に `[!!]` で始まるメッセージを書き出します。
+
+1. Before installing, delete the old `Mods\native120fps\` folder from the game root.
+2. When you install the loader, overwrite the old `dinput8.dll` with the loader's
+   `dinput8.dll`.
+3. If you also use the other MixedNuts mods at 1.x (Mouse Wheel Camera Speed =
+   `version.dll` + `Mods\wheelspeed\`, TwinSwap = `xinput1_4.dll` + `Mods\twinswap\`),
+   update them all at once. See the loader's README for details.
+
+If an old 1.x DLL is still in the game root, the loader does not load the
+corresponding new mod and writes a message starting with `[!!]` to
+`MixedNuts\loader.log`.
+
+### 他の Mod との併用 / Using with other mods
+
+Native 120FPS Option、Mouse Wheel Camera Speed、TwinSwap の 2.0.0 はすべて同じ
+ローダーの上で動くため、DLL を 1 つ共有し、互いに競合しません。
+
+別の Mod がすでに `dinput8.dll` を使っている場合は、上書きしないでください。
+ローダーの `dinput8.dll` は `version.dll` または `xinput1_4.dll` に名前を変えて
+使えます（ローダーの README を参照してください）。
+
+Native 120FPS Option, Mouse Wheel Camera Speed and TwinSwap 2.0.0 all run on the same
+loader, so they share one DLL and never conflict.
+
+If another mod already uses `dinput8.dll`, do not overwrite it. The loader's
+`dinput8.dll` can be renamed to `version.dll` or `xinput1_4.dll` (see the loader's
+README).
 
 ## 対応言語 / Language support
 
@@ -113,7 +180,13 @@ build.bat
 
 clone 済みなら / If already cloned: `git submodule update --init`
 
-`dist\` に配布用の一式が出力されます。 / The distributable set is written to `dist\`.
+`dist\MixedNuts\Mods\native120fps\` に配布用の一式が出力されます。
+The distributable set is written to `dist\MixedNuts\Mods\native120fps\`.
+
+submodule の代わりに手元の mod-loader を使う場合は、環境変数 `MIXEDNUTS_LOADER` に
+そのチェックアウト先を指定してから `build.bat` を実行してください。
+To build against a local checkout of mod-loader instead of the submodule, set the
+environment variable `MIXEDNUTS_LOADER` to its path before running `build.bat`.
 
 ## 仕組み / How it works
 
@@ -146,13 +219,15 @@ as a file.** The patch is applied to the decrypted code in memory after launch.
 Changes 2 and 3 are archive data, and writing to memory is not enough: the game
 reloads those blocks into the same address, so any write is undone.
 
-そこで、**ユーザー自身のゲームフォルダから読み取った内容を書き換えた複製を
-`Mods\native120fps\` 内に生成**し、`CreateFileW` を横取りしてそちらを読ませています。
+そこで、Mod は 2 つの書き換えをローダーに登録します。ゲームが各アーカイブを
+初めて開くとき、ローダーは**ユーザー自身のゲームフォルダにある現在の内容を Mod に
+書き換えさせ、その複製を `MixedNuts\cache\archive\` から読ませます。**
 ゲーム側のファイルは読むだけで、書き換えません。
 
-Instead the mod **reads the files from the user's own game folder, writes modified
-copies into `Mods\native120fps\`**, and hooks `CreateFileW` so the game opens those
-copies. The game's own files are only read, never written.
+Instead the mod registers the two changes with the loader. When the game first opens
+each archive, the loader **has the mod patch the current contents from the user's own
+game folder, and serves the result from `MixedNuts\cache\archive\`.** The game's own
+files are only read, never written.
 
 | ファイル / File | 書き換える内容 / What is changed |
 |---|---|
@@ -224,20 +299,24 @@ Save data is located at:
   Turn V-Sync off, otherwise the frame rate is capped at the refresh rate.
 - ゲームのアップデートでシグネチャが変わると動作しなくなる場合があります
   A game update may change the signature and break this mod.
-- 他プロセスのメモリを書き換えるため、ウイルス対策ソフトが誤検知することがあります
-  Antivirus software may flag it, since it writes to another process's memory.
-- 初回起動時に約 17MB の作業用ファイルを Mod 自身のフォルダ内に生成します
-  About 17 MB of working data is generated inside the mod's own folder on first launch.
+- 他プロセスのメモリを書き換えるため、ウイルス対策ソフトが誤検知することがあります。
+  書き込むファイルは `MixedNuts` フォルダの中（Mod 自身のフォルダとローダーの
+  キャッシュ）だけです
+  Antivirus software may flag it, since it writes to another process's memory. The
+  only files written are inside the `MixedNuts` folder (the mod's own folder and the
+  loader's cache).
+- 初回起動時に約 17MB の作業用ファイルを `MixedNuts\cache\archive\` に生成します
+  About 17 MB of working data is generated in `MixedNuts\cache\archive\` on first launch.
 
 ## 不具合の報告 / Reporting issues
 
 不具合を見つけた場合は、GitHub の Issue でご報告ください。その際、**必ず
-`Mods\native120fps\native120fps.log` を添付してください。** ログが無いと原因を
-特定できず、対応できない場合があります。
+`MixedNuts\Mods\native120fps\native120fps.log` と `MixedNuts\loader.log` の 2 つを
+添付してください。** ログが無いと原因を特定できず、対応できない場合があります。
 
-If you run into a problem, please open a GitHub Issue. **Be sure to attach
-`Mods\native120fps\native120fps.log`.** Without the log the cause usually cannot be
-identified, and the issue may not be actionable.
+If you run into a problem, please open a GitHub Issue. **Be sure to attach both
+`MixedNuts\Mods\native120fps\native120fps.log` and `MixedNuts\loader.log`.** Without
+the logs the cause usually cannot be identified, and the issue may not be actionable.
 
 併せて、次の情報をいただけると助かります。
 The following details also help:
