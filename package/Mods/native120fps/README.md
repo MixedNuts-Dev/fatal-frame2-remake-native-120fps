@@ -11,7 +11,7 @@ Created by MixedNuts
 2.0.0 is a plugin for the loader.
 
 Nexus Mods: https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26
-GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+GitHub: https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader
 
 ---
 
@@ -30,7 +30,7 @@ GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 - FATAL FRAME II: Crimson Butterfly REMAKE（Steam 版）
 - **MixedNutsModLoader 1.0.0 以降**（別途導入が必要です）
   Nexus Mods: https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26
-  GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+  GitHub: https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader
 - 120Hz 以上に対応したディスプレイ
 - 120FPS を維持できる PC 性能
 - 空きディスク容量 約 20MB（初回起動時に作業用ファイルを生成します）
@@ -77,7 +77,7 @@ GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
 1. ゲームを終了します
 
 2. 先に **MixedNutsModLoader**（1.0.0 以降）を導入します。
-   https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader の Releases から
+   https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader の Releases から
    ダウンロードし、ローダーの README に従ってください
 
 3. この配布物の `MixedNuts` フォルダを、ゲームのルートディレクトリ
@@ -271,7 +271,7 @@ Mod はローダーに読み込まれています。
 記録されます。ゲームのインストール先のパスも含まれるので、
 気になる場合はその行を消してから添付してください。
 
-https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
+https://github.com/MixedNutsJP/fatal-frame2-remake-native-120fps/issues
 
 併せて、次の情報をいただけると助かります。
 
@@ -342,7 +342,7 @@ hardcodes the choice to two entries, and this mod removes that restriction.
 - FATAL FRAME II: Crimson Butterfly REMAKE (Steam)
 - **MixedNutsModLoader 1.0.0 or later** (installed separately)
   Nexus Mods: https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26
-  GitHub: https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+  GitHub: https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader
 - A display capable of 120Hz or higher
 - A PC able to sustain 120 FPS
 - About 20 MB of free disk space (working files are generated on first launch)
@@ -388,7 +388,7 @@ their settings change.
 1. Close the game.
 
 2. First install **MixedNutsModLoader** (1.0.0 or later). Download it from the
-   Releases of https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader
+   Releases of https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader
    and follow the loader's README.
 
 3. Copy this download's `MixedNuts` folder into the game's root directory
@@ -585,7 +585,7 @@ and refresh rate, your GPU name, the Windows build, and the frame rate value the
 game has saved. It also contains the path the game is installed to — feel free to
 delete that line before attaching it if you would rather not share it.
 
-https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps/issues
+https://github.com/MixedNutsJP/fatal-frame2-remake-native-120fps/issues
 
 The following details also help:
 
@@ -651,4 +651,4 @@ MIT License — Copyright (c) 2026 MixedNuts
 This software is provided under the MIT License. You are free to redistribute and
 modify it, but the copyright notice and the license text must be retained.
 
-https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps
+https://github.com/MixedNutsJP/fatal-frame2-remake-native-120fps

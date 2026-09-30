@@ -15,11 +15,11 @@ By default only 30 and 60 are selectable.
 **The game already supports 120 FPS internally.** The menu handler simply hardcodes
 the choice list to two entries, and this mod removes that restriction.
 
-> **2.0.0 からは [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)（1.0.0 以降）が必要です。**
+> **2.0.0 からは [MixedNutsModLoader](https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader)（1.0.0 以降）が必要です。**
 > 1.x は単体で動作していましたが、2.0.0 はローダーのプラグインになり、`dinput8.dll` を
 > 同梱しなくなりました。ローダーは別途導入してください。
 >
-> **Version 2.0.0 requires [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader) (1.0.0 or later).**
+> **Version 2.0.0 requires [MixedNutsModLoader](https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader) (1.0.0 or later).**
 > 1.x ran on its own; 2.0.0 is a plugin for the loader and no longer ships `dinput8.dll`.
 > Install the loader separately.
 
@@ -47,7 +47,7 @@ This differs from editing the `graphics_option.json` settings file by hand:
 
 **ビルドは不要です。**
 
-1. 先に [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
+1. 先に [MixedNutsModLoader](https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader)
    （1.0.0 以降）を、その Releases か [Nexus Mods](https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26) からダウンロードして導入します
 2. この Mod の [Releases](../../releases) から配布物をダウンロードし、中身の
    `MixedNuts` フォルダを、ゲームのルート（`FatalFrameII.exe` と同じ場所）に
@@ -55,7 +55,7 @@ This differs from editing the `graphics_option.json` settings file by hand:
 
 **No build required.**
 
-1. First install [MixedNutsModLoader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)
+1. First install [MixedNutsModLoader](https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader)
    (1.0.0 or later), downloaded from its Releases or [Nexus Mods](https://www.nexusmods.com/fatalframe2crimsonbutterflyremake/mods/26).
 2. Download this mod from [Releases](../../releases) and copy its `MixedNuts` folder
    into the game's root directory (the folder containing `FatalFrameII.exe`). It
@@ -168,13 +168,13 @@ code does not expect a third entry when it restores the cursor position.
 Visual Studio 2022 の C++ ツールセットが必要です。
 Requires the Visual Studio 2022 C++ toolset.
 
-共通コード（[mod-loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader)）を
+共通コード（[mod-loader](https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader)）を
 submodule で取り込んでいるので、`--recursive` 付きで clone してください。
-The shared code ([mod-loader](https://github.com/MixedNuts-Dev/fatal-frame2-remake-mod-loader))
+The shared code ([mod-loader](https://github.com/MixedNutsJP/fatal-frame2-remake-mod-loader))
 is a git submodule, so clone with `--recursive`.
 
 ```
-git clone --recursive https://github.com/MixedNuts-Dev/fatal-frame2-remake-native-120fps.git
+git clone --recursive https://github.com/MixedNutsJP/fatal-frame2-remake-native-120fps.git
 build.bat
 ```
 
